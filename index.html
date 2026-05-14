@@ -1,0 +1,1012 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>PicStitch PWA</title>
+
+    <link rel="manifest" href="manifest.json" />
+
+    <!-- <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css"
+    />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script> -->
+
+    <link rel="stylesheet" href="cropper.min.css"/>
+
+    <script src="cropper.min.js"></script>
+
+    <script src="jspdf.umd.min.js"></script>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #111;
+        color: white;
+        font-family: Arial, sans-serif;
+      }
+
+      header {
+        padding: 16px;
+        background: #1f1f1f;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .container {
+        padding: 16px;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      button,
+      input {
+        border: none;
+        border-radius: 10px;
+        padding: 12px;
+      }
+
+      button {
+        background: #4f46e5;
+        color: white;
+        cursor: pointer;
+      }
+
+      button:hover {
+        opacity: 0.9;
+      }
+
+      .preview-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .preview-item {
+        position: relative;
+
+        width: 120px;
+
+        height: 220px;
+
+        background: #1b1b1b;
+
+        border-radius: 14px;
+
+        overflow: hidden;
+
+        border: 2px solid #333;
+
+        flex-shrink: 0;
+      }
+
+      .preview-item img {
+        width: 100%;
+
+        height: 100%;
+
+        object-fit: contain;
+
+        background: #111;
+
+        display: block;
+
+        pointer-events: none;
+      }
+
+      .preview-delete {
+        position: absolute;
+
+        top: 8px;
+
+        right: 8px;
+
+        width: 28px;
+
+        height: 28px;
+
+        border-radius: 50%;
+
+        background: red;
+
+        color: white;
+
+        border: none;
+
+        z-index: 20;
+
+        font-size: 14px;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: center;
+      }
+
+      .preview-item button {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: red;
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+
+      canvas {
+        width: 100%;
+
+        border-radius: 12px;
+
+        display: none;
+
+        background: transparent;
+      }
+
+      .slider-group {
+        margin-bottom: 20px;
+      }
+
+      #cropModal {
+        display: none;
+
+        position: fixed;
+
+        inset: 0;
+
+        background: #111;
+
+        z-index: 99999;
+
+        flex-direction: column;
+      }
+
+      #cropImage {
+        max-width: 100%;
+
+        max-height: calc(100vh - 140px);
+
+        object-fit: contain;
+
+        display: block;
+      }
+
+      .crop-controls {
+        margin-top: 20px;
+
+        display: flex;
+        gap: 12px;
+
+        position: sticky;
+        bottom: 10px;
+
+        background: #111;
+
+        padding: 12px;
+
+        border-radius: 12px;
+
+        z-index: 10000;
+      }
+
+      .crop-controls button {
+        font-size: 16px;
+
+        padding: 14px 20px;
+
+        min-width: 120px;
+      }
+
+      .crop-header {
+        height: 70px;
+
+        display: flex;
+
+        align-items: center;
+
+        justify-content: space-between;
+
+        padding: 0 16px;
+
+        background: #1a1a1a;
+
+        border-bottom: 1px solid #333;
+      }
+
+      .crop-title {
+        font-size: 18px;
+
+        font-weight: bold;
+      }
+
+      .crop-body {
+        flex: 1;
+
+        display: flex;
+
+        justify-content: center;
+
+        align-items: center;
+
+        overflow: hidden;
+
+        padding: 10px;
+      }
+
+      .crop-controls {
+        height: 70px;
+
+        display: flex;
+
+        justify-content: center;
+
+        align-items: center;
+
+        gap: 12px;
+
+        background: #1a1a1a;
+
+        border-top: 1px solid #333;
+      }
+
+      .cropper-point {
+        width: 24px !important;
+        height: 24px !important;
+        opacity: 1 !important;
+      }
+
+      .cropper-line {
+        background: #4f46e5 !important;
+      }
+
+      .cropper-point.point-se {
+        width: 32px !important;
+        height: 32px !important;
+      }
+
+      .cropper-view-box {
+        outline: 2px solid #4f46e5 !important;
+      }
+
+      .cropper-face {
+        background: rgba(79, 70, 229, 0.15) !important;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>PicStitch PWA</header>
+
+    <div class="container">
+      <div class="controls">
+        <input type="file" id="imageInput" multiple accept="image/*" />
+
+        <button onclick="combineVertical()">Vertical</button>
+
+        <button onclick="combineHorizontal()">Horizontal</button>
+
+        <button onclick="cropCombined()">Crop Combined</button>
+
+        <button onclick="downloadImage()">Export JPG</button>
+
+        <button onclick="exportPDF()">Export PDF</button>
+
+
+      </div>
+
+      <div class="slider-group">
+        Export Quality:
+
+        <select id="qualitySelect">
+          <option value="0.5">Good (~50%)</option>
+
+          <option value="0.8" selected>Better (~80%)</option>
+
+          <option value="1">Best (~100%)</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom: 12px; color: #bbb; font-size: 14px">
+        Click photos below to crop
+      </div>
+
+      <div class="preview-list" id="previewList"></div>
+
+      <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="cropModal">
+      <div class="crop-header">
+        <button onclick="closeCrop()">← Back</button>
+
+        <div class="crop-title">Crop Editor</div>
+
+        <button onclick="applyCrop()">Apply</button>
+      </div>
+
+      <div class="crop-body">
+        <img id="cropImage" />
+      </div>
+
+      <div class="crop-controls">
+        <button onclick="undoCrop()">Undo</button>
+
+        <button onclick="redoCrop()">Redo</button>
+
+        <button onclick="resetCrop()">Reset</button>
+      </div>
+    </div>
+
+    <script>
+      let cropper = null;
+
+      let currentCropIndex = null;
+
+      let cropMode = "image";
+
+      let cropHistory = {};
+
+      let redoHistory = {};
+
+      let images = [];
+
+      let combineMode = null;
+
+      const imageInput = document.getElementById("imageInput");
+
+      const previewList = document.getElementById("previewList");
+
+      const canvas = document.getElementById("canvas");
+
+      const ctx = canvas.getContext("2d");
+
+      imageInput.addEventListener("change", async (e) => {
+        const files = [...e.target.files];
+
+        for (const file of files) {
+          const reader = new FileReader();
+
+          reader.onload = () => {
+            const img = new Image();
+
+            img.onload = () => {
+              images.push({
+                original: reader.result,
+
+                current: reader.result,
+
+                img,
+
+                cropData: null,
+              });
+
+              renderPreview();
+            };
+
+            img.src = reader.result;
+          };
+
+          reader.readAsDataURL(file);
+        }
+      });
+
+      clearCanvas();
+
+      function renderPreview() {
+        previewList.replaceChildren();
+        previewList.innerHTML = "";
+
+        images.forEach((item, index) => {
+          const div = document.createElement("div");
+
+          div.className = "preview-item";
+
+          div.draggable = true;
+
+          div.innerHTML = `
+
+            <img src="${item.current}">
+
+            <button
+                class="preview-delete"
+            >
+                ✕
+            </button>
+        `;
+
+          const deleteBtn = div.querySelector(".preview-delete");
+
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+
+            removeImage(index);
+          });
+
+          // Entire photo clickable for crop
+          div.addEventListener("click", () => {
+            openCrop(index);
+          });
+
+          div.addEventListener("dragstart", () => {
+            div.dataset.dragIndex = index;
+          });
+
+          div.addEventListener("dragover", (e) => {
+            e.preventDefault();
+          });
+
+          div.addEventListener("drop", (e) => {
+            e.preventDefault();
+
+            const from = Number(
+              document.querySelector("[data-drag-index]")?.dataset.dragIndex,
+            );
+
+            const to = index;
+
+            const moved = images.splice(from, 1)[0];
+
+            images.splice(to, 0, moved);
+
+            rerenderCanvas();
+
+            renderPreview();
+          });
+
+          previewList.appendChild(div);
+        });
+      }
+
+      function removeImage(index) {
+        // remove image
+        images.splice(index, 1);
+
+        if (images.length === 0) {
+          imageInput.value = "";
+        }
+
+        // cleanup histories
+        delete cropHistory[index];
+
+        delete redoHistory[index];
+
+        // rebuild histories
+        const newCropHistory = {};
+        const newRedoHistory = {};
+
+        images.forEach((_, i) => {
+          newCropHistory[i] = cropHistory[i] || [];
+
+          newRedoHistory[i] = redoHistory[i] || [];
+        });
+
+        cropHistory = newCropHistory;
+
+        redoHistory = newRedoHistory;
+
+        // clear crop selection if deleted
+        if (currentCropIndex === index) {
+          closeCrop();
+
+          currentCropIndex = null;
+        }
+
+        // reset file input when empty
+        if (images.length === 0) {
+          imageInput.value = "";
+
+          combineMode = null;
+
+          clearCanvas();
+        } else {
+          rerenderCanvas();
+        }
+
+        renderPreview();
+      }
+
+      function rerenderCanvas() {
+        if (combineMode === "vertical") {
+          combineVertical();
+        } else if (combineMode === "horizontal") {
+          combineHorizontal();
+        } else {
+          clearCanvas();
+        }
+      }
+
+      function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        canvas.width = 1;
+
+        canvas.height = 1;
+
+        canvas.style.display = "none";
+      }
+
+      function combineVertical() {
+        combineMode = "vertical";
+
+        canvas.style.display = "block";
+
+        if (images.length === 0) return;
+
+        // calculate actual visible widths
+        const widths = images.map((item) => {
+          if (item.cropData) {
+            return item.cropData.width;
+          }
+
+          return item.img.width;
+        });
+
+        const targetWidth = Math.max(...widths);
+
+        let totalHeight = 0;
+
+        const scaledImages = [];
+
+        for (const item of images) {
+          let sourceWidth = item.img.width;
+
+          let sourceHeight = item.img.height;
+
+          if (item.cropData) {
+            sourceWidth = item.cropData.width;
+
+            sourceHeight = item.cropData.height;
+          }
+
+          const scale = targetWidth / sourceWidth;
+
+          const scaledHeight = sourceHeight * scale;
+
+          scaledImages.push({
+            item,
+
+            width: targetWidth,
+
+            height: scaledHeight,
+          });
+
+          totalHeight += scaledHeight;
+        }
+
+        canvas.width = targetWidth;
+
+        canvas.height = totalHeight;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        let y = 0;
+
+        for (const scaled of scaledImages) {
+          const crop = scaled.item.cropData;
+
+          if (crop) {
+            ctx.drawImage(
+              scaled.item.img,
+
+              crop.x,
+              crop.y,
+              crop.width,
+              crop.height,
+
+              0,
+              y,
+
+              scaled.width,
+              scaled.height,
+            );
+          } else {
+            ctx.drawImage(
+              scaled.item.img,
+
+              0,
+              y,
+
+              scaled.width,
+              scaled.height,
+            );
+          }
+
+          y += scaled.height;
+        }
+      }
+
+      function combineHorizontal() {
+        combineMode = "horizontal";
+
+        canvas.style.display = "block";
+
+        if (images.length === 0) return;
+
+        // calculate actual visible heights
+        const heights = images.map((item) => {
+          if (item.cropData) {
+            return item.cropData.height;
+          }
+
+          return item.img.height;
+        });
+
+        const targetHeight = Math.max(...heights);
+
+        let totalWidth = 0;
+
+        const scaledImages = [];
+
+        for (const item of images) {
+          let sourceWidth = item.img.width;
+
+          let sourceHeight = item.img.height;
+
+          if (item.cropData) {
+            sourceWidth = item.cropData.width;
+
+            sourceHeight = item.cropData.height;
+          }
+
+          const scale = targetHeight / sourceHeight;
+
+          const scaledWidth = sourceWidth * scale;
+
+          scaledImages.push({
+            item,
+
+            width: scaledWidth,
+
+            height: targetHeight,
+          });
+
+          totalWidth += scaledWidth;
+        }
+
+        canvas.width = totalWidth;
+
+        canvas.height = targetHeight;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        let x = 0;
+
+        for (const scaled of scaledImages) {
+          const crop = scaled.item.cropData;
+
+          if (crop) {
+            ctx.drawImage(
+              scaled.item.img,
+
+              crop.x,
+              crop.y,
+              crop.width,
+              crop.height,
+
+              x,
+              0,
+
+              scaled.width,
+              scaled.height,
+            );
+          } else {
+            ctx.drawImage(
+              scaled.item.img,
+
+              x,
+              0,
+
+              scaled.width,
+              scaled.height,
+            );
+          }
+
+          x += scaled.width;
+        }
+      }
+
+      function openCrop(index) {
+        cropMode = "image";
+
+        currentCropIndex = index;
+
+        const modal = document.getElementById("cropModal");
+
+        const cropImage = document.getElementById("cropImage");
+
+        modal.style.display = "flex";
+
+        cropImage.onload = () => {
+          if (cropper) {
+            cropper.destroy();
+          }
+
+          cropper = new Cropper(cropImage, {
+            viewMode: 0,
+
+            autoCropArea: 1,
+
+            responsive: true,
+
+            background: false,
+
+            movable: true,
+
+            zoomable: true,
+
+            scalable: true,
+
+            rotatable: true,
+
+            guides: true,
+
+            center: true,
+
+            highlight: true,
+
+            cropBoxMovable: true,
+
+            cropBoxResizable: true,
+
+            dragMode: "move",
+
+            ready() {
+              const savedCrop = images[index].cropData;
+
+              // restore previous crop
+              if (savedCrop) {
+                cropper.setData(savedCrop);
+              }
+            },
+          });
+        };
+
+        // ALWAYS load original image
+        cropImage.src = images[index].original;
+      }
+
+      function cropCombined() {
+        cropMode = "combined";
+
+        currentCropIndex = null;
+
+        const modal = document.getElementById("cropModal");
+
+        const cropImage = document.getElementById("cropImage");
+
+        modal.style.display = "flex";
+
+        cropImage.onload = () => {
+          if (cropper) {
+            cropper.destroy();
+          }
+
+          cropper = new Cropper(cropImage, {
+            viewMode: 1,
+
+            autoCropArea: 1,
+
+            responsive: true,
+
+            background: false,
+
+            movable: true,
+
+            zoomable: true,
+
+            scalable: true,
+
+            rotatable: true,
+
+            guides: true,
+
+            center: true,
+
+            highlight: true,
+
+            cropBoxMovable: true,
+
+            cropBoxResizable: true,
+          });
+        };
+
+        cropImage.src = canvas.toDataURL("image/png");
+      }
+
+      function applyCrop() {
+        if (!cropper) return;
+
+        if (cropMode === "combined") {
+          applyCombinedCrop();
+
+          return;
+        }
+
+        // save crop box
+        const cropData = cropper.getData();
+
+        images[currentCropIndex].cropData = cropData;
+
+        // preview image only
+        const croppedCanvas = cropper.getCroppedCanvas();
+
+        const previewSrc = croppedCanvas.toDataURL("image/png");
+
+        images[currentCropIndex].current = previewSrc;
+
+        rerenderCanvas();
+
+        renderPreview();
+
+        closeCrop();
+      }
+
+      function applyCombinedCrop() {
+        const croppedCanvas = cropper.getCroppedCanvas();
+
+        canvas.width = croppedCanvas.width;
+
+        canvas.height = croppedCanvas.height;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.drawImage(croppedCanvas, 0, 0);
+
+        closeCrop();
+      }
+
+      function resetCrop() {
+        if (currentCropIndex === null) return;
+
+        // remove crop state only
+        images[currentCropIndex].cropData = null;
+
+        // restore preview
+        images[currentCropIndex].current = images[currentCropIndex].original;
+
+        rerenderCanvas();
+
+        renderPreview();
+
+        // IMPORTANT:
+        // fully reset cropper live
+        if (cropper) {
+          cropper.reset();
+        }
+      }
+
+      function undoCrop() {
+        if (currentCropIndex === null) return;
+
+        const history = cropHistory[currentCropIndex];
+
+        if (history.length <= 1) return;
+
+        const current = history.pop();
+
+        redoHistory[currentCropIndex].push(current);
+
+        const previous = history[history.length - 1];
+
+        loadCropState(previous);
+      }
+
+      function redoCrop() {
+        if (currentCropIndex === null) return;
+
+        const redo = redoHistory[currentCropIndex];
+
+        if (redo.length === 0) return;
+
+        const next = redo.pop();
+
+        cropHistory[currentCropIndex].push(next);
+
+        loadCropState(next);
+      }
+
+      function loadCropState(src) {
+        const cropImage = document.getElementById("cropImage");
+
+        cropImage.onload = () => {
+          if (cropper) {
+            cropper.destroy();
+          }
+
+          cropper = new Cropper(cropImage, {
+            viewMode: 1,
+
+            autoCropArea: 1,
+
+            responsive: true,
+
+            background: false,
+
+            movable: true,
+
+            zoomable: true,
+
+            scalable: true,
+
+            rotatable: true,
+
+            guides: true,
+
+            center: true,
+
+            highlight: true,
+
+            cropBoxMovable: true,
+
+            cropBoxResizable: true,
+          });
+        };
+
+        cropImage.src = src;
+      }
+
+      function closeCrop() {
+        const modal = document.getElementById("cropModal");
+
+        modal.style.display = "none";
+
+        if (cropper) {
+          cropper.destroy();
+
+          cropper = null;
+        }
+      }
+
+      function downloadImage() {
+        const quality = Number(document.getElementById("qualitySelect").value);
+
+        const link = document.createElement("a");
+
+        link.download = `combined_${Date.now()}.jpg`;
+
+        link.href = canvas.toDataURL("image/jpeg", quality);
+
+        link.click();
+      }
+
+      async function exportPDF() {
+        const { jsPDF } = window.jspdf;
+
+        const pdf = new jsPDF({
+          orientation: "portrait",
+
+          unit: "px",
+
+          format: [canvas.width, canvas.height],
+        });
+
+        const imgData = canvas.toDataURL("image/jpeg", 1);
+
+        pdf.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
+
+        pdf.save(`combined_${Date.now()}.pdf`);
+      }
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js");
+      }
+    </script>
+  </body>
+</html>
