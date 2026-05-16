@@ -1,4 +1,4 @@
-const CACHE_NAME = 'picstitch-v2'
+const CACHE_NAME = 'picstitch-v9'
 
 const urlsToCache = [
   './',
