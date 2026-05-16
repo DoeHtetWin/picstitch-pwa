@@ -17,7 +17,6 @@
     <link rel="stylesheet" href="cropper.min.css" />
     <script src="cropper.min.js"></script>
     <script src="jspdf.umd.min.js"></script>
-
     <style>
       * {
         box-sizing: border-box;
@@ -206,6 +205,16 @@
         backdrop-filter: blur(4px);
       }
 
+      .preview-check {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        width: 22px;
+        height: 22px;
+        z-index: 20;
+        cursor: pointer;
+      }
+
       .preview-delete:hover {
         background: rgb(239, 68, 68);
         transform: scale(1.1);
@@ -217,6 +226,7 @@
         display: none;
         background: transparent;
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+        cursor: pointer;
       }
 
       /* --- CROP MODAL --- */
@@ -230,10 +240,15 @@
       }
 
       #cropImage {
-        max-width: 100%;
-        max-height: calc(100vh - 140px);
-        object-fit: contain;
         display: block;
+
+        width: auto;
+        height: auto;
+
+        max-width: 100%;
+        max-height: 100%;
+
+        object-fit: contain;
       }
 
       .crop-header {
@@ -253,11 +268,15 @@
 
       .crop-body {
         flex: 1;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        position: relative;
         overflow: hidden;
-        padding: 10px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        min-height: 0;
+        background: #000;
       }
 
       .crop-controls {
@@ -308,6 +327,11 @@
       .cropper-face {
         background: rgba(79, 70, 229, 0.15) !important;
       }
+
+      .cropper-container {
+        width: 100% !important;
+        height: 100% !important;
+      }
     </style>
   </head>
 
@@ -326,7 +350,7 @@
       <div class="controls">
         <button onclick="combineVertical()">Vertical</button>
         <button onclick="combineHorizontal()">Horizontal</button>
-        <button onclick="cropCombined()">Crop Combined</button>
+        <button onclick="saveCanvasAsGroup()">Save Group</button>
         <button onclick="downloadImage()">Export JPG</button>
         <button onclick="exportPDF()">Export PDF</button>
       </div>
@@ -382,11 +406,19 @@
       let redoHistory = {};
       let images = [];
       let combineMode = null;
+      let isRestoringHistory = false;
+      let draggedIndex = null;
 
       const imageInput = document.getElementById("imageInput");
       const previewList = document.getElementById("previewList");
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d");
+
+      canvas.addEventListener("click", () => {
+        if (canvas.width <= 1 || canvas.height <= 1) return;
+
+        cropCombined();
+      });
 
       imageInput.addEventListener("change", async (e) => {
         const files = [...e.target.files];
@@ -396,10 +428,12 @@
             const img = new Image();
             img.onload = () => {
               images.push({
+                id: crypto.randomUUID(),
                 original: reader.result,
                 current: reader.result,
                 img,
                 cropData: null,
+                selected: true,
               });
               renderPreview();
             };
@@ -412,7 +446,6 @@
       clearCanvas();
 
       function renderPreview() {
-        previewList.replaceChildren();
         previewList.innerHTML = "";
 
         images.forEach((item, index) => {
@@ -421,10 +454,25 @@
           div.draggable = true;
           div.innerHTML = `
             <img src="${item.current}">
+
+            <input
+              type="checkbox"
+              class="preview-check"
+              ${item.selected ? "checked" : ""}
+            >
+
             <button class="preview-delete">✕</button>
           `;
 
           const deleteBtn = div.querySelector(".preview-delete");
+          const checkbox = div.querySelector(".preview-check");
+
+          checkbox.addEventListener("click", (e) => {
+            e.stopPropagation();
+
+            item.selected = checkbox.checked;
+            rerenderCanvas();
+          });
           deleteBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             removeImage(index);
@@ -435,7 +483,7 @@
           });
 
           div.addEventListener("dragstart", () => {
-            div.dataset.dragIndex = index;
+            draggedIndex = index;
           });
 
           div.addEventListener("dragover", (e) => {
@@ -444,10 +492,9 @@
 
           div.addEventListener("drop", (e) => {
             e.preventDefault();
-            const from = Number(
-              document.querySelector("[data-drag-index]")?.dataset.dragIndex,
-            );
+            const from = draggedIndex;
             const to = index;
+            if (from === to) return;
             const moved = images.splice(from, 1)[0];
             images.splice(to, 0, moved);
             rerenderCanvas();
@@ -459,25 +506,12 @@
       }
 
       function removeImage(index) {
+        const image = images[index];
+
+        delete cropHistory[image.id];
+        delete redoHistory[image.id];
+
         images.splice(index, 1);
-
-        if (images.length === 0) {
-          imageInput.value = "";
-        }
-
-        delete cropHistory[index];
-        delete redoHistory[index];
-
-        const newCropHistory = {};
-        const newRedoHistory = {};
-
-        images.forEach((_, i) => {
-          newCropHistory[i] = cropHistory[i] || [];
-          newRedoHistory[i] = redoHistory[i] || [];
-        });
-
-        cropHistory = newCropHistory;
-        redoHistory = newRedoHistory;
 
         if (currentCropIndex === index) {
           closeCrop();
@@ -516,18 +550,25 @@
         combineMode = "vertical";
         canvas.style.display = "block";
 
-        if (images.length === 0) return;
+        const activeImages = images.filter((item) => item.selected);
 
-        const widths = images.map((item) => {
+        if (activeImages.length === 0) {
+          clearCanvas();
+          return;
+        }
+
+        const widths = activeImages.map((item) => {
           if (item.cropData) return item.cropData.width;
           return item.img.width;
         });
 
         const targetWidth = Math.max(...widths);
+
         let totalHeight = 0;
+
         const scaledImages = [];
 
-        for (const item of images) {
+        for (const item of activeImages) {
           let sourceWidth = item.img.width;
           let sourceHeight = item.img.height;
 
@@ -537,6 +578,7 @@
           }
 
           const scale = targetWidth / sourceWidth;
+
           const scaledHeight = sourceHeight * scale;
 
           scaledImages.push({
@@ -550,6 +592,7 @@
 
         canvas.width = targetWidth;
         canvas.height = totalHeight;
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         let y = 0;
@@ -572,6 +615,7 @@
           } else {
             ctx.drawImage(scaled.item.img, 0, y, scaled.width, scaled.height);
           }
+
           y += scaled.height;
         }
       }
@@ -580,18 +624,25 @@
         combineMode = "horizontal";
         canvas.style.display = "block";
 
-        if (images.length === 0) return;
+        const activeImages = images.filter((item) => item.selected);
 
-        const heights = images.map((item) => {
+        if (activeImages.length === 0) {
+          clearCanvas();
+          return;
+        }
+
+        const heights = activeImages.map((item) => {
           if (item.cropData) return item.cropData.height;
           return item.img.height;
         });
 
         const targetHeight = Math.max(...heights);
+
         let totalWidth = 0;
+
         const scaledImages = [];
 
-        for (const item of images) {
+        for (const item of activeImages) {
           let sourceWidth = item.img.width;
           let sourceHeight = item.img.height;
 
@@ -601,6 +652,7 @@
           }
 
           const scale = targetHeight / sourceHeight;
+
           const scaledWidth = sourceWidth * scale;
 
           scaledImages.push({
@@ -614,6 +666,7 @@
 
         canvas.width = totalWidth;
         canvas.height = targetHeight;
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         let x = 0;
@@ -636,8 +689,43 @@
           } else {
             ctx.drawImage(scaled.item.img, x, 0, scaled.width, scaled.height);
           }
+
           x += scaled.width;
         }
+      }
+
+      function saveCropState() {
+        if (!cropper || isRestoringHistory) return;
+
+        const state = cropper.getData();
+
+        const key =
+          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
+
+        if (!cropHistory[key]) {
+          cropHistory[key] = [];
+        }
+
+        if (!redoHistory[key]) {
+          redoHistory[key] = [];
+        }
+
+        const history = cropHistory[key];
+
+        const last = history[history.length - 1];
+
+        // avoid duplicate saves
+        if (last && JSON.stringify(last) === JSON.stringify(state)) {
+          return;
+        }
+
+        history.push(JSON.parse(JSON.stringify(state)));
+
+        if (history.length > 50) {
+          history.shift();
+        }
+
+        redoHistory[key] = [];
       }
 
       function openCrop(index) {
@@ -653,6 +741,10 @@
           if (cropper) cropper.destroy();
 
           cropper = new Cropper(cropImage, {
+            cropend() {
+              saveCropState();
+            },
+
             viewMode: 0,
             autoCropArea: 1,
             responsive: true,
@@ -667,9 +759,24 @@
             cropBoxMovable: true,
             cropBoxResizable: true,
             dragMode: "move",
+            modal: true,
+            restore: false,
+            checkOrientation: false,
             ready() {
               const savedCrop = images[index].cropData;
-              if (savedCrop) cropper.setData(savedCrop);
+
+              if (savedCrop) {
+                cropper.setData(savedCrop);
+              }
+
+              // save initial state
+              const key = images[currentCropIndex].id;
+
+              cropHistory[key] = [
+                JSON.parse(JSON.stringify(cropper.getData())),
+              ];
+
+              redoHistory[key] = [];
             },
           });
         };
@@ -678,6 +785,7 @@
       }
 
       function cropCombined() {
+        if (canvas.width <= 1 || canvas.height <= 1) return;
         cropMode = "combined";
         currentCropIndex = null;
 
@@ -690,7 +798,19 @@
           if (cropper) cropper.destroy();
 
           cropper = new Cropper(cropImage, {
-            viewMode: 1,
+            cropend() {
+              saveCropState();
+            },
+
+            ready() {
+              cropHistory["combined"] = [
+                JSON.parse(JSON.stringify(cropper.getData())),
+              ];
+
+              redoHistory["combined"] = [];
+            },
+
+            viewMode: 0,
             autoCropArea: 1,
             responsive: true,
             background: false,
@@ -740,64 +860,69 @@
       }
 
       function resetCrop() {
-        if (currentCropIndex === null) return;
+        if (!cropper) return;
 
-        images[currentCropIndex].cropData = null;
-        images[currentCropIndex].current = images[currentCropIndex].original;
+        cropper.reset();
 
-        rerenderCanvas();
-        renderPreview();
+        if (cropMode === "image" && currentCropIndex !== null) {
+          images[currentCropIndex].cropData = null;
+          images[currentCropIndex].current = images[currentCropIndex].original;
 
-        if (cropper) cropper.reset();
+          rerenderCanvas();
+          renderPreview();
+        }
       }
 
       function undoCrop() {
-        if (currentCropIndex === null) return;
-        const history = cropHistory[currentCropIndex];
-        if (history.length <= 1) return;
+        const key =
+          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
+
+        const history = cropHistory[key];
+
+        if (!history || history.length < 2) return;
 
         const current = history.pop();
-        redoHistory[currentCropIndex].push(current);
+
+        if (!redoHistory[key]) {
+          redoHistory[key] = [];
+        }
+
+        redoHistory[key].push(current);
+
         const previous = history[history.length - 1];
 
-        loadCropState(previous);
+        isRestoringHistory = true;
+
+        cropper.setData(previous);
+
+        setTimeout(() => {
+          isRestoringHistory = false;
+        }, 50);
       }
 
       function redoCrop() {
-        if (currentCropIndex === null) return;
-        const redo = redoHistory[currentCropIndex];
-        if (redo.length === 0) return;
+        const key =
+          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
+
+        const redo = redoHistory[key];
+
+        if (!redo || redo.length === 0) return;
 
         const next = redo.pop();
-        cropHistory[currentCropIndex].push(next);
 
-        loadCropState(next);
-      }
+        if (!cropHistory[key]) {
+          cropHistory[key] = [];
+        }
 
-      function loadCropState(src) {
-        const cropImage = document.getElementById("cropImage");
+        cropHistory[key].push(next);
 
-        cropImage.onload = () => {
-          if (cropper) cropper.destroy();
+        isRestoringHistory = true;
 
-          cropper = new Cropper(cropImage, {
-            viewMode: 1,
-            autoCropArea: 1,
-            responsive: true,
-            background: false,
-            movable: true,
-            zoomable: true,
-            scalable: true,
-            rotatable: true,
-            guides: true,
-            center: true,
-            highlight: true,
-            cropBoxMovable: true,
-            cropBoxResizable: true,
-          });
-        };
+        cropper.setData(next);
 
-        cropImage.src = src;
+        setTimeout(() => {
+          isRestoringHistory = false;
+        }, 50);
       }
 
       function closeCrop() {
@@ -810,6 +935,7 @@
       }
 
       function downloadImage() {
+        if (canvas.width <= 1 || canvas.height <= 1) return;
         const quality = Number(document.getElementById("qualitySelect").value);
         const link = document.createElement("a");
         link.download = `combined_${Date.now()}.jpg`;
@@ -817,7 +943,53 @@
         link.click();
       }
 
+      function saveCanvasAsGroup() {
+        if (canvas.width === 0 || canvas.height === 0) return;
+
+        const dataUrl = canvas.toDataURL("image/png");
+
+        const img = new Image();
+
+        img.onload = () => {
+          // remove selected images completely
+          images = images.filter((item) => !item.selected);
+
+          // add reusable group
+          images.push({
+            id: crypto.randomUUID(),
+            original: dataUrl,
+            current: dataUrl,
+            img,
+            cropData: null,
+            isGroup: true,
+            selected: true,
+          });
+
+          // clear orphan histories
+          const validIds = new Set(images.map((img) => img.id));
+
+          for (const key in cropHistory) {
+            if (key !== "combined" && !validIds.has(key)) {
+              delete cropHistory[key];
+            }
+          }
+
+          for (const key in redoHistory) {
+            if (key !== "combined" && !validIds.has(key)) {
+              delete redoHistory[key];
+            }
+          }
+
+          renderPreview();
+
+          // clearCanvas();
+        };
+
+        img.src = dataUrl;
+      }
+
       async function exportPDF() {
+        if (canvas.width <= 1 || canvas.height <= 1) return;
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({
           orientation: "portrait",
