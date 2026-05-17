@@ -13,3 +13,4 @@ can test with Local Wi-Fi Test (Ultimate Real-World Test) (achieve with this cod
 - Fix Drag and Drop function not working properly in iOS
 
 - Add banner notifications for export jpg and pdf
+- iOS offline bug fixed
