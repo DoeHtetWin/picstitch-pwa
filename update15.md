@@ -14,3 +14,15 @@ can test with Local Wi-Fi Test (Ultimate Real-World Test) (achieve with this cod
 
 - Add banner notifications for export jpg and pdf
 - iOS offline bug fixed
+
+Key changes applied:
+
+- Firefox/Cross-Platform Bug Fix: Added the explicit event parameter to the HTML buttons and JavaScript export functions (downloadImage(event) and exportPDF(event)) so it no longer throws a reference error.
+
+- Mobile UI Freezing (Optimization): Added a small setTimeout block inside combineVertical and combineHorizontal. This forces the browser to update the UI (showing the toast) before locking the main thread to do the heavy canvas pixel math.
+
+- Memory Protection (Optimization): Added a safeguard in the upload listener restricting the total active images to 20, preventing silent out-of-memory crashes on iOS Safari.
+
+- Drag-and-Drop Conflict (UX): Added touch-action: none; to .preview-item so scrolling down the page doesn't accidentally trigger a drag event on mobile devices.
+
+- Empty States & Feedback (UX): Added toast notifications when images start loading, and warning toasts if you click export/combine without selecting any photos.
