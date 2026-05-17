@@ -25,6 +25,7 @@
         MobileDragDrop.polyfill({
           dragImageTranslateOverride:
             MobileDragDrop.scrollBehaviourDragImageTranslateOverride,
+            holdToDrag: 300 
         });
       });
     </script>
@@ -581,6 +582,9 @@
 
           div.addEventListener("dragstart", () => {
             draggedIndex = index;
+            if (navigator.vibrate) {
+              navigator.vibrate(50);
+            }
           });
 
           div.addEventListener("dragover", (e) => {
