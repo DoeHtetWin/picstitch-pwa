@@ -9,4 +9,5 @@ can test with Local Wi-Fi Test (Ultimate Real-World Test) (achieve with this cod
     - Open your phone: Connect your phone to the same Wi-Fi as your computer. Open Safari or Chrome on your phone and type in the IP address and port together, like this: http://192.168.1.15:5500.
 
 
-Implement App's Preview List (The Small Thumbnails)
+- Implement App's Preview List (The Small Thumbnails)
+- Fix Drag and Drop function not working properly in iOS
