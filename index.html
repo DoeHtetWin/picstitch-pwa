@@ -25,8 +25,14 @@
         MobileDragDrop.polyfill({
           dragImageTranslateOverride:
             MobileDragDrop.scrollBehaviourDragImageTranslateOverride,
-            holdToDrag: 300 
-        });
+            holdToDrag: 300, // FIX: Wait 300ms before dragging so normal scrolling works!
+            forceApply: true // FIX 1: Force the polyfill to override Apple's broken native drag!
+          });
+
+        // FIX 2: Stop the iOS magnifying glass/menu from breaking the long-press
+        window.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+        }); 
       });
     </script>
     <script src="cropper.min.js"></script>
@@ -588,6 +594,11 @@
           });
 
           div.addEventListener("dragover", (e) => {
+            e.preventDefault();
+          });
+
+          // FIX 3: iOS Safari strictly requires this extra rule to allow dropping!
+          div.addEventListener("dragenter", (e) => {
             e.preventDefault();
           });
 
