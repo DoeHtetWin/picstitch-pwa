@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>PicStitch PWA</title>
     <link rel="manifest" href="manifest.json" />
 
@@ -15,11 +18,22 @@
     <link rel="apple-touch-icon" href="image/icon-192.png" />
 
     <link rel="stylesheet" href="cropper.min.css" />
+    <link rel="stylesheet" href="mobile-drag-drop.css" />
+    <script src="mobile-drag-drop.js"></script>
+    <script>
+      window.addEventListener("DOMContentLoaded", () => {
+        MobileDragDrop.polyfill({
+          dragImageTranslateOverride:
+            MobileDragDrop.scrollBehaviourDragImageTranslateOverride,
+        });
+      });
+    </script>
     <script src="cropper.min.js"></script>
     <script src="jspdf.umd.min.js"></script>
     <style>
       * {
         box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent; /* Add this line! */
       }
 
       body {
@@ -29,6 +43,25 @@
         font-family:
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
           Arial, sans-serif;
+
+        /* FIX: Prevent UI from hiding under the iPhone Notch or Android Home Bar */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+
+        /* FIX: Prevent annoying blue text highlights when tapping quickly */
+        -webkit-user-select: none;
+        user-select: none;
+        /* FIX: Disable the long-press context menu on mobile */
+        -webkit-touch-callout: none;
+      }
+
+      /* Ensure inputs still work even if the body is locked */
+      input,
+      select {
+        -webkit-user-select: auto;
+        user-select: auto;
       }
 
       header {
@@ -205,14 +238,32 @@
         backdrop-filter: blur(4px);
       }
 
-      .preview-check {
+      /* Replace .preview-check with these numbered badges */
+      .preview-badge {
         position: absolute;
         top: 8px;
         left: 8px;
-        width: 22px;
-        height: 22px;
+        width: 26px;
+        height: 26px;
         z-index: 20;
         cursor: pointer;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.4);
+        border: 2px solid #ffffff;
+        color: transparent; /* Hide text when unselected */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        backdrop-filter: blur(4px);
+        transition: all 0.2s ease;
+      }
+
+      .preview-badge.selected {
+        background: #4f46e5;
+        border-color: #4f46e5;
+        color: #ffffff; /* Show number when selected */
       }
 
       .preview-delete:hover {
@@ -237,6 +288,8 @@
         background: #0f1115;
         z-index: 99999;
         flex-direction: column;
+        touch-action: none; /* Add this! Stops pull-to-refresh and background scrolling */
+        overscroll-behavior: none; /* Add this! Prevents scroll chaining */
       }
 
       #cropImage {
@@ -339,6 +392,20 @@
       .cropper-container img {
         max-width: none !important;
       }
+
+      #cropModal {
+        /* ... your existing styles ... */
+        animation: fadeIn 0.15s ease-out forwards;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
     </style>
   </head>
 
@@ -427,27 +494,41 @@
         cropCombined();
       });
 
+      // FIX: Use Promise.all to load images in the EXACT order they were selected
       imageInput.addEventListener("change", async (e) => {
         const files = [...e.target.files];
-        for (const file of files) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const img = new Image();
-            img.onload = () => {
-              images.push({
-                id: crypto.randomUUID(),
-                original: reader.result,
-                current: reader.result,
-                img,
-                cropData: null,
-                selected: true,
-              });
-              renderPreview();
-            };
-            img.src = reader.result;
-          };
-          reader.readAsDataURL(file);
-        }
+
+        const loadedImages = await Promise.all(
+          files.map((file) => {
+            return new Promise((resolve) => {
+              const objectUrl = URL.createObjectURL(file);
+              const img = new Image();
+
+              img.onload = () => {
+                resolve({
+                  id:
+                    window.crypto && window.crypto.randomUUID
+                      ? window.crypto.randomUUID()
+                      : Date.now().toString(36) +
+                        Math.random().toString(36).substring(2),
+                  original: objectUrl,
+                  current: objectUrl,
+                  img,
+                  cropData: null,
+                  selected: true,
+                });
+              };
+              img.src = objectUrl;
+            });
+          }),
+        );
+
+        // Add them to the main array strictly in order
+        images.push(...loadedImages);
+
+        renderPreview();
+        rerenderCanvas(); // Auto update canvas
+        e.target.value = "";
       });
 
       clearCanvas();
@@ -455,31 +536,40 @@
       function renderPreview() {
         previewList.innerHTML = "";
 
+        // Track the current selection order
+        let currentNumber = 1;
+
         images.forEach((item, index) => {
           const div = document.createElement("div");
           div.className = "preview-item";
           div.draggable = true;
+
+          // Determine badge styling and number
+          let badgeClass = "preview-badge";
+          let badgeText = "";
+          if (item.selected) {
+            badgeClass += " selected";
+            badgeText = currentNumber++; // Assign number and increment
+          }
+
           div.innerHTML = `
             <img src="${item.current}">
 
-            <input
-              type="checkbox"
-              class="preview-check"
-              ${item.selected ? "checked" : ""}
-            >
+            <div class="${badgeClass}">${badgeText}</div>
 
             <button class="preview-delete">✕</button>
           `;
 
           const deleteBtn = div.querySelector(".preview-delete");
-          const checkbox = div.querySelector(".preview-check");
+          const badge = div.querySelector(".preview-badge");
 
-          checkbox.addEventListener("click", (e) => {
+          badge.addEventListener("click", (e) => {
             e.stopPropagation();
-
-            item.selected = checkbox.checked;
+            item.selected = !item.selected;
+            renderPreview(); // FIX: Re-render instantly to recalculate all numbers!
             rerenderCanvas();
           });
+          
           deleteBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             removeImage(index);
@@ -505,7 +595,7 @@
             const moved = images.splice(from, 1)[0];
             images.splice(to, 0, moved);
             rerenderCanvas();
-            renderPreview();
+            renderPreview(); // FIX: Re-render instantly so drag-and-drop updates numbers
           });
 
           previewList.appendChild(div);
@@ -514,6 +604,11 @@
 
       function removeImage(index) {
         const image = images[index];
+
+        // FIX: Force the browser to flush the high-res file from RAM!
+        if (image.original && image.original.startsWith("blob:")) {
+          URL.revokeObjectURL(image.original);
+        }
 
         delete cropHistory[image.id];
         delete redoHistory[image.id];
@@ -537,13 +632,25 @@
       }
 
       function rerenderCanvas() {
+        const activeImages = images.filter((item) => item.selected);
+
+        if (activeImages.length === 0) {
+          clearCanvas();
+          return;
+        }
+
         if (combineMode === "vertical") {
           combineVertical();
         } else if (combineMode === "horizontal") {
           combineHorizontal();
-        } else {
-          clearCanvas();
+        } else if (activeImages.length === 1) {
+          // FIX: Draw the single image neutrally so the canvas doesn't disappear,
+          // but immediately reset the mode so it doesn't force the NEXT combination!
+          combineVertical();
+          combineMode = null;
         }
+        // If combineMode is null and multiple images are selected, it patiently does nothing.
+        // It waits for you to explicitly click Vertical or Horizontal!
       }
 
       function clearCanvas() {
@@ -570,9 +677,7 @@
         });
 
         const targetWidth = Math.max(...widths);
-
         let totalHeight = 0;
-
         const scaledImages = [];
 
         for (const item of activeImages) {
@@ -585,7 +690,6 @@
           }
 
           const scale = targetWidth / sourceWidth;
-
           const scaledHeight = sourceHeight * scale;
 
           scaledImages.push({
@@ -597,8 +701,29 @@
           totalHeight += scaledHeight;
         }
 
-        canvas.width = targetWidth;
-        canvas.height = totalHeight;
+        // --- SAFETY SCALE CHECK ---
+        const MAX_CANVAS_AREA = 16000000;
+        const MAX_DIMENSION = 8000; // FIX: Apple's strict height/width limit
+        const currentArea = targetWidth * totalHeight;
+        let finalScale = 1;
+
+        // 1. Check total area
+        if (currentArea > MAX_CANVAS_AREA) {
+          finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
+        }
+
+        // 2. Check maximum iOS height limit
+        if (totalHeight * finalScale > MAX_DIMENSION) {
+          finalScale = MAX_DIMENSION / totalHeight;
+        }
+
+        // 3. Check maximum iOS width limit
+        if (targetWidth * finalScale > MAX_DIMENSION) {
+          finalScale = MAX_DIMENSION / targetWidth;
+        }
+
+        canvas.width = targetWidth * finalScale;
+        canvas.height = totalHeight * finalScale;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -606,6 +731,10 @@
 
         for (const scaled of scaledImages) {
           const crop = scaled.item.cropData;
+
+          // Apply the scale to the drawing dimensions
+          const drawWidth = scaled.width * finalScale;
+          const drawHeight = scaled.height * finalScale;
 
           if (crop) {
             ctx.drawImage(
@@ -616,14 +745,15 @@
               crop.height,
               0,
               y,
-              scaled.width,
-              scaled.height,
+              drawWidth,
+              drawHeight,
             );
           } else {
-            ctx.drawImage(scaled.item.img, 0, y, scaled.width, scaled.height);
+            ctx.drawImage(scaled.item.img, 0, y, drawWidth, drawHeight);
           }
 
-          y += scaled.height;
+          // Increment y by the scaled height so the next image starts in the right spot!
+          y += drawHeight;
         }
       }
 
@@ -644,9 +774,7 @@
         });
 
         const targetHeight = Math.max(...heights);
-
         let totalWidth = 0;
-
         const scaledImages = [];
 
         for (const item of activeImages) {
@@ -659,7 +787,6 @@
           }
 
           const scale = targetHeight / sourceHeight;
-
           const scaledWidth = sourceWidth * scale;
 
           scaledImages.push({
@@ -671,8 +798,29 @@
           totalWidth += scaledWidth;
         }
 
-        canvas.width = totalWidth;
-        canvas.height = targetHeight;
+        // --- SAFETY SCALE CHECK ---
+        const MAX_CANVAS_AREA = 16000000;
+        const MAX_DIMENSION = 8000; // FIX: Apple's strict height/width limit
+        const currentArea = totalWidth * targetHeight;
+        let finalScale = 1;
+
+        // 1. Check total area
+        if (currentArea > MAX_CANVAS_AREA) {
+          finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
+        }
+
+        // 2. Check maximum iOS width limit
+        if (totalWidth * finalScale > MAX_DIMENSION) {
+          finalScale = MAX_DIMENSION / totalWidth;
+        }
+
+        // 3. Check maximum iOS height limit
+        if (targetHeight * finalScale > MAX_DIMENSION) {
+          finalScale = MAX_DIMENSION / targetHeight;
+        }
+
+        canvas.width = totalWidth * finalScale;
+        canvas.height = targetHeight * finalScale;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -680,6 +828,10 @@
 
         for (const scaled of scaledImages) {
           const crop = scaled.item.cropData;
+
+          // Apply the scale to the drawing dimensions
+          const drawWidth = scaled.width * finalScale;
+          const drawHeight = scaled.height * finalScale;
 
           if (crop) {
             ctx.drawImage(
@@ -690,14 +842,15 @@
               crop.height,
               x,
               0,
-              scaled.width,
-              scaled.height,
+              drawWidth,
+              drawHeight,
             );
           } else {
-            ctx.drawImage(scaled.item.img, x, 0, scaled.width, scaled.height);
+            ctx.drawImage(scaled.item.img, x, 0, drawWidth, drawHeight);
           }
 
-          x += scaled.width;
+          // Increment x by the scaled width!
+          x += drawWidth;
         }
       }
 
@@ -742,18 +895,22 @@
         const modal = document.getElementById("cropModal");
         const cropImage = document.getElementById("cropImage");
 
+        // FIX: Clear previous cropper and image to prevent flash
+        if (cropper) {
+          cropper.destroy();
+          cropper = null;
+        }
+        cropImage.removeAttribute("src");
+
         modal.style.display = "flex";
 
         cropImage.onload = () => {
-          if (cropper) cropper.destroy();
-
           cropper = new Cropper(cropImage, {
             minContainerWidth: 300,
             minContainerHeight: 300,
             cropend() {
               saveCropState();
             },
-
             viewMode: 0,
             autoCropArea: 1,
             responsive: true,
@@ -770,7 +927,7 @@
             dragMode: "move",
             modal: true,
             restore: false,
-            checkOrientation: false,
+            checkOrientation: true /* FIX: Changed from false to true to fix mobile rotation */,
             ready() {
               const savedCrop = images[index].cropData;
 
@@ -778,13 +935,10 @@
                 cropper.setData(savedCrop);
               }
 
-              // save initial state
               const key = images[currentCropIndex].id;
-
               cropHistory[key] = [
                 JSON.parse(JSON.stringify(cropper.getData())),
               ];
-
               redoHistory[key] = [];
             },
           });
@@ -801,43 +955,53 @@
         const modal = document.getElementById("cropModal");
         const cropImage = document.getElementById("cropImage");
 
+        // FIX 1: Prevent "ghost image" flickering by clearing previous state
+        if (cropper) {
+          cropper.destroy();
+          cropper = null;
+        }
+        cropImage.removeAttribute("src"); // Clear the image element completely
+
         modal.style.display = "flex";
 
-        cropImage.onload = () => {
-          if (cropper) cropper.destroy();
+        // FIX 2: Use asynchronous toBlob to prevent freezing the UI thread on mobile
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
 
-          cropper = new Cropper(cropImage, {
-            minContainerWidth: 300,
-            minContainerHeight: 300,
-            cropend() {
-              saveCropState();
-            },
+          cropImage.onload = () => {
+            cropper = new Cropper(cropImage, {
+              minContainerWidth: 300,
+              minContainerHeight: 300,
+              cropend() {
+                saveCropState();
+              },
+              ready() {
+                cropHistory["combined"] = [
+                  JSON.parse(JSON.stringify(cropper.getData())),
+                ];
+                redoHistory["combined"] = [];
 
-            ready() {
-              cropHistory["combined"] = [
-                JSON.parse(JSON.stringify(cropper.getData())),
-              ];
+                // FIX 3: Revoke the object URL to free up mobile memory once Cropper is ready
+                URL.revokeObjectURL(url);
+              },
+              viewMode: 0,
+              autoCropArea: 1,
+              responsive: true,
+              background: false,
+              movable: true,
+              zoomable: true,
+              scalable: true,
+              rotatable: true,
+              guides: true,
+              center: true,
+              highlight: true,
+              cropBoxMovable: true,
+              cropBoxResizable: true,
+            });
+          };
 
-              redoHistory["combined"] = [];
-            },
-
-            viewMode: 0,
-            autoCropArea: 1,
-            responsive: true,
-            background: false,
-            movable: true,
-            zoomable: true,
-            scalable: true,
-            rotatable: true,
-            guides: true,
-            center: true,
-            highlight: true,
-            cropBoxMovable: true,
-            cropBoxResizable: true,
-          });
-        };
-
-        cropImage.src = canvas.toDataURL("image/png");
+          cropImage.src = url;
+        }, "image/png");
       }
 
       function applyCrop() {
@@ -945,72 +1109,148 @@
         }
       }
 
-      function downloadImage() {
+      async function downloadImage() {
         if (canvas.width <= 1 || canvas.height <= 1) return;
-        const quality = Number(document.getElementById("qualitySelect").value);
-        const link = document.createElement("a");
-        link.download = `combined_${Date.now()}.jpg`;
-        link.href = canvas.toDataURL("image/jpeg", quality);
-        link.click();
+
+        // 1. Grab the button and show a loading state
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = "Processing...";
+        btn.style.opacity = "0.7";
+        btn.disabled = true;
+
+        // 2. Force the browser to pause for a split second to update the button UI
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        try {
+          const quality = Number(
+            document.getElementById("qualitySelect").value,
+          );
+          const link = document.createElement("a");
+          // Standardized the naming convention to match the PDF
+          link.download = `PicStitch_${Date.now()}.jpg`;
+          link.href = canvas.toDataURL("image/jpeg", quality);
+          link.click();
+        } catch (error) {
+          console.error("Export failed:", error);
+          alert(
+            "The export failed. The file might be too large for the device memory.",
+          );
+        } finally {
+          // 3. Always restore the button, even if it fails
+          btn.innerText = originalText;
+          btn.style.opacity = "1";
+          btn.disabled = false;
+        }
       }
 
       function saveCanvasAsGroup() {
         if (canvas.width === 0 || canvas.height === 0) return;
 
-        const dataUrl = canvas.toDataURL("image/png");
-
-        const img = new Image();
-
-        img.onload = () => {
-          // remove selected images completely
-          images = images.filter((item) => !item.selected);
-
-          // add reusable group
-          images.push({
-            id: crypto.randomUUID(),
-            original: dataUrl,
-            current: dataUrl,
-            img,
-            cropData: null,
-            isGroup: true,
-            selected: true,
-          });
-
-          // clear orphan histories
-          const validIds = new Set(images.map((img) => img.id));
-
-          for (const key in cropHistory) {
-            if (key !== "combined" && !validIds.has(key)) {
-              delete cropHistory[key];
-            }
+        // FIX: Use async toBlob to prevent freezing on mobile
+        canvas.toBlob((blob) => {
+          // FIX: Add safety check in case the device still rejects the massive image
+          if (!blob) {
+            alert(
+              "This group is too large for the device's memory. Try exporting to PDF/JPG directly, or group fewer photos at a time.",
+            );
+            return;
           }
 
-          for (const key in redoHistory) {
-            if (key !== "combined" && !validIds.has(key)) {
-              delete redoHistory[key];
+          const dataUrl = URL.createObjectURL(blob);
+          const img = new Image();
+
+          img.onload = () => {
+            // remove selected images completely AND clear their memory
+            images = images.filter((item) => {
+              if (item.selected) {
+                if (item.original && item.original.startsWith("blob:")) {
+                  URL.revokeObjectURL(item.original);
+                }
+                return false;
+              }
+              return true;
+            });
+
+            // add reusable group
+            images.push({
+              id:
+                window.crypto && window.crypto.randomUUID
+                  ? window.crypto.randomUUID()
+                  : Date.now().toString(36) +
+                    Math.random().toString(36).substring(2),
+              original: dataUrl,
+              current: dataUrl,
+              img,
+              cropData: null,
+              isGroup: true,
+              selected: true,
+            });
+
+            // clear orphan histories
+            const validIds = new Set(images.map((img) => img.id));
+
+            for (const key in cropHistory) {
+              if (key !== "combined" && !validIds.has(key)) {
+                delete cropHistory[key];
+              }
             }
-          }
 
-          renderPreview();
+            for (const key in redoHistory) {
+              if (key !== "combined" && !validIds.has(key)) {
+                delete redoHistory[key];
+              }
+            }
 
-          // clearCanvas();
-        };
+            // FIX: Reset the mode and redraw the canvas so it safely displays your new group!
+            combineMode = null;
+            renderPreview();
+            rerenderCanvas();
+          };
 
-        img.src = dataUrl;
+          img.src = dataUrl;
+        }, "image/png");
       }
 
       async function exportPDF() {
         if (canvas.width <= 1 || canvas.height <= 1) return;
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({
-          orientation: "portrait",
-          unit: "px",
-          format: [canvas.width, canvas.height],
-        });
 
-        const imgData = canvas.toDataURL("image/jpeg", 1);
-        pdf.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
-        pdf.save(`combined_${Date.now()}.pdf`);
+        // 1. Grab the button and show a loading state
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = "Processing...";
+        btn.style.opacity = "0.7";
+        btn.disabled = true;
+
+        // 2. Force the browser to pause for a split second to update the button UI
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        try {
+          const { jsPDF } = window.jspdf;
+          const pdfWidth = 800;
+          const scale = pdfWidth / canvas.width;
+          const pdfHeight = canvas.height * scale;
+
+          const pdf = new jsPDF({
+            orientation: pdfHeight > pdfWidth ? "portrait" : "landscape",
+            unit: "px",
+            format: [pdfWidth, pdfHeight],
+          });
+
+          const imgData = canvas.toDataURL("image/jpeg", 0.75);
+          pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+          pdf.save(`PicStitch_${Date.now()}.pdf`);
+        } catch (error) {
+          console.error("Export failed:", error);
+          alert(
+            "The export failed. The file might be too large for the device memory.",
+          );
+        } finally {
+          // 3. Always restore the button, even if it fails
+          btn.innerText = originalText;
+          btn.style.opacity = "1";
+          btn.disabled = false;
+        }
       }
 
       if ("serviceWorker" in navigator) {
