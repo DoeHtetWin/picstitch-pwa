@@ -25,11 +25,10 @@
         MobileDragDrop.polyfill({
           dragImageTranslateOverride:
             MobileDragDrop.scrollBehaviourDragImageTranslateOverride,
-          holdToDrag: 300, // FIX: Wait 300ms before dragging so normal scrolling works!
-          forceApply: true, // FIX 1: Force the polyfill to override Apple's broken native drag!
+          holdToDrag: 300,
+          forceApply: true,
         });
 
-        // FIX 2: Stop the iOS magnifying glass/menu from breaking the long-press
         window.addEventListener("contextmenu", (event) => {
           event.preventDefault();
         });
@@ -40,7 +39,7 @@
     <style>
       * {
         box-sizing: border-box;
-        -webkit-tap-highlight-color: transparent; /* Add this line! */
+        -webkit-tap-highlight-color: transparent;
       }
 
       body {
@@ -50,21 +49,15 @@
         font-family:
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
           Arial, sans-serif;
-
-        /* FIX: Prevent UI from hiding under the iPhone Notch or Android Home Bar */
         padding-top: env(safe-area-inset-top);
         padding-bottom: env(safe-area-inset-bottom);
         padding-left: env(safe-area-inset-left);
         padding-right: env(safe-area-inset-right);
-
-        /* FIX: Prevent annoying blue text highlights when tapping quickly */
         -webkit-user-select: none;
         user-select: none;
-        /* FIX: Disable the long-press context menu on mobile */
         -webkit-touch-callout: none;
       }
 
-      /* Ensure inputs still work even if the body is locked */
       input,
       select {
         -webkit-user-select: auto;
@@ -87,7 +80,6 @@
         padding: 16px;
       }
 
-      /* --- MODERN FILE UPLOAD --- */
       .upload-section {
         margin-bottom: 20px;
       }
@@ -125,7 +117,6 @@
         display: none;
       }
 
-      /* --- MODERN ACTION BUTTONS --- */
       .controls {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -153,7 +144,6 @@
         transform: translateY(-2px);
       }
 
-      /* --- MODERN EXPORT QUALITY SELECTOR --- */
       .custom-select-wrapper {
         background: #1e293b;
         padding: 16px 20px;
@@ -197,7 +187,6 @@
         box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
       }
 
-      /* --- FLUID PREVIEWS --- */
       .preview-list {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -245,7 +234,6 @@
         backdrop-filter: blur(4px);
       }
 
-      /* Replace .preview-check with these numbered badges */
       .preview-badge {
         position: absolute;
         top: 8px;
@@ -257,7 +245,7 @@
         border-radius: 50%;
         background: rgba(0, 0, 0, 0.4);
         border: 2px solid #ffffff;
-        color: transparent; /* Hide text when unselected */
+        color: transparent;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -270,7 +258,7 @@
       .preview-badge.selected {
         background: #4f46e5;
         border-color: #4f46e5;
-        color: #ffffff; /* Show number when selected */
+        color: #ffffff;
       }
 
       .preview-delete:hover {
@@ -287,7 +275,6 @@
         cursor: pointer;
       }
 
-      /* --- CROP MODAL --- */
       #cropModal {
         display: none;
         position: fixed;
@@ -295,18 +282,15 @@
         background: #0f1115;
         z-index: 99999;
         flex-direction: column;
-        touch-action: none; /* Add this! Stops pull-to-refresh and background scrolling */
-        overscroll-behavior: none; /* Add this! Prevents scroll chaining */
+        touch-action: none;
+        overscroll-behavior: none;
       }
 
       #cropImage {
         display: block;
-
         width: 100%;
         height: 100%;
-
         object-fit: contain;
-
         max-width: none;
         max-height: none;
       }
@@ -329,15 +313,11 @@
       .crop-body {
         flex: 1;
         position: relative;
-
         overflow: hidden;
-
         display: flex;
         align-items: center;
         justify-content: center;
-
         background: #000;
-
         min-height: 0;
         min-width: 0;
       }
@@ -366,7 +346,6 @@
         background: #475569;
       }
 
-      /* Cropper.js overrides for theme matching */
       .cropper-point {
         width: 24px !important;
         height: 24px !important;
@@ -401,23 +380,17 @@
       }
 
       #cropModal {
-        /* ... your existing styles ... */
         animation: fadeIn 0.15s ease-out forwards;
       }
 
       @keyframes fadeIn {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
+        from { opacity: 0; }
+        to { opacity: 1; }
       }
 
-      /* --- TOAST NOTIFICATION BANNER --- */
       .toast {
         position: fixed;
-        top: -100px; /* Hidden off-screen initially */
+        top: -100px;
         left: 50%;
         transform: translateX(-50%);
         background: #4f46e5;
@@ -436,7 +409,6 @@
       }
 
       .toast.show {
-        /* Drops down just below the mobile notch */
         top: calc(env(safe-area-inset-top, 20px) + 20px);
       }
     </style>
@@ -458,8 +430,8 @@
         <button onclick="combineVertical()">Vertical</button>
         <button onclick="combineHorizontal()">Horizontal</button>
         <button onclick="saveCanvasAsGroup()">Save Group</button>
-        <button onclick="downloadImage()">Export JPG</button>
-        <button onclick="exportPDF()">Export PDF</button>
+        <button onclick="downloadImage(event)">Export JPG</button>
+        <button onclick="exportPDF(event)">Export PDF</button>
       </div>
 
       <div class="slider-group custom-select-wrapper">
@@ -524,13 +496,22 @@
 
       canvas.addEventListener("click", () => {
         if (canvas.width <= 1 || canvas.height <= 1) return;
-
         cropCombined();
       });
 
-      // FIX: Use Promise.all to load images in the EXACT order they were selected
       imageInput.addEventListener("change", async (e) => {
         const files = [...e.target.files];
+        if (files.length === 0) return;
+
+        // FIX: Memory limit safeguard
+        if (images.length + files.length > 20) {
+          showToast("Maximum of 20 images allowed to protect memory.", true);
+          e.target.value = "";
+          return;
+        }
+
+        // FIX: Loading feedback
+        showToast("Loading images...");
 
         const loadedImages = await Promise.all(
           files.map((file) => {
@@ -557,11 +538,9 @@
           }),
         );
 
-        // Add them to the main array strictly in order
         images.push(...loadedImages);
-
         renderPreview();
-        rerenderCanvas(); // Auto update canvas
+        rerenderCanvas();
         e.target.value = "";
       });
 
@@ -569,8 +548,6 @@
 
       function renderPreview() {
         previewList.innerHTML = "";
-
-        // Track the current selection order
         let currentNumber = 1;
 
         images.forEach((item, index) => {
@@ -578,19 +555,16 @@
           div.className = "preview-item";
           div.draggable = true;
 
-          // Determine badge styling and number
           let badgeClass = "preview-badge";
           let badgeText = "";
           if (item.selected) {
             badgeClass += " selected";
-            badgeText = currentNumber++; // Assign number and increment
+            badgeText = currentNumber++;
           }
 
           div.innerHTML = `
             <img src="${item.current}">
-
             <div class="${badgeClass}">${badgeText}</div>
-
             <button class="preview-delete">✕</button>
           `;
 
@@ -600,7 +574,7 @@
           badge.addEventListener("click", (e) => {
             e.stopPropagation();
             item.selected = !item.selected;
-            renderPreview(); // FIX: Re-render instantly to recalculate all numbers!
+            renderPreview();
             rerenderCanvas();
           });
 
@@ -624,7 +598,6 @@
             e.preventDefault();
           });
 
-          // FIX 3: iOS Safari strictly requires this extra rule to allow dropping!
           div.addEventListener("dragenter", (e) => {
             e.preventDefault();
           });
@@ -637,7 +610,7 @@
             const moved = images.splice(from, 1)[0];
             images.splice(to, 0, moved);
             rerenderCanvas();
-            renderPreview(); // FIX: Re-render instantly so drag-and-drop updates numbers
+            renderPreview();
           });
 
           previewList.appendChild(div);
@@ -647,7 +620,6 @@
       function removeImage(index) {
         const image = images[index];
 
-        // FIX: Force the browser to flush the high-res file from RAM!
         if (image.original && image.original.startsWith("blob:")) {
           URL.revokeObjectURL(image.original);
         }
@@ -686,13 +658,9 @@
         } else if (combineMode === "horizontal") {
           combineHorizontal();
         } else if (activeImages.length === 1) {
-          // FIX: Draw the single image neutrally so the canvas doesn't disappear,
-          // but immediately reset the mode so it doesn't force the NEXT combination!
           combineVertical();
           combineMode = null;
         }
-        // If combineMode is null and multiple images are selected, it patiently does nothing.
-        // It waits for you to explicitly click Vertical or Horizontal!
       }
 
       function clearCanvas() {
@@ -703,247 +671,216 @@
       }
 
       function combineVertical() {
+        const activeImages = images.filter((item) => item.selected);
+        if (activeImages.length === 0) {
+            showToast("Please select photos first", true);
+            clearCanvas();
+            return;
+        }
+
         combineMode = "vertical";
         canvas.style.display = "block";
 
-        const activeImages = images.filter((item) => item.selected);
+        // FIX: Provide UI feedback and yield to main thread before heavy processing
+        showToast("Processing layout...");
+        
+        setTimeout(() => {
+            const widths = activeImages.map((item) => {
+              if (item.cropData) return item.cropData.width;
+              return item.img.width;
+            });
 
-        if (activeImages.length === 0) {
-          clearCanvas();
-          return;
-        }
+            const targetWidth = Math.max(...widths);
+            let totalHeight = 0;
+            const scaledImages = [];
 
-        const widths = activeImages.map((item) => {
-          if (item.cropData) return item.cropData.width;
-          return item.img.width;
-        });
+            for (const item of activeImages) {
+              let sourceWidth = item.img.width;
+              let sourceHeight = item.img.height;
 
-        const targetWidth = Math.max(...widths);
-        let totalHeight = 0;
-        const scaledImages = [];
+              if (item.cropData) {
+                sourceWidth = item.cropData.width;
+                sourceHeight = item.cropData.height;
+              }
 
-        for (const item of activeImages) {
-          let sourceWidth = item.img.width;
-          let sourceHeight = item.img.height;
+              const scale = targetWidth / sourceWidth;
+              const scaledHeight = sourceHeight * scale;
 
-          if (item.cropData) {
-            sourceWidth = item.cropData.width;
-            sourceHeight = item.cropData.height;
-          }
+              scaledImages.push({
+                item,
+                width: targetWidth,
+                height: scaledHeight,
+              });
 
-          const scale = targetWidth / sourceWidth;
-          const scaledHeight = sourceHeight * scale;
+              totalHeight += scaledHeight;
+            }
 
-          scaledImages.push({
-            item,
-            width: targetWidth,
-            height: scaledHeight,
-          });
+            const MAX_CANVAS_AREA = 16000000;
+            const MAX_DIMENSION = 8000; 
+            const currentArea = targetWidth * totalHeight;
+            let finalScale = 1;
 
-          totalHeight += scaledHeight;
-        }
+            if (currentArea > MAX_CANVAS_AREA) {
+              finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
+            }
+            if (totalHeight * finalScale > MAX_DIMENSION) {
+              finalScale = MAX_DIMENSION / totalHeight;
+            }
+            if (targetWidth * finalScale > MAX_DIMENSION) {
+              finalScale = MAX_DIMENSION / targetWidth;
+            }
 
-        // --- SAFETY SCALE CHECK ---
-        const MAX_CANVAS_AREA = 16000000;
-        const MAX_DIMENSION = 8000; // FIX: Apple's strict height/width limit
-        const currentArea = targetWidth * totalHeight;
-        let finalScale = 1;
+            canvas.width = targetWidth * finalScale;
+            canvas.height = totalHeight * finalScale;
 
-        // 1. Check total area
-        if (currentArea > MAX_CANVAS_AREA) {
-          finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
-        }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let y = 0;
 
-        // 2. Check maximum iOS height limit
-        if (totalHeight * finalScale > MAX_DIMENSION) {
-          finalScale = MAX_DIMENSION / totalHeight;
-        }
+            for (const scaled of scaledImages) {
+              const crop = scaled.item.cropData;
+              const drawWidth = scaled.width * finalScale;
+              const drawHeight = scaled.height * finalScale;
 
-        // 3. Check maximum iOS width limit
-        if (targetWidth * finalScale > MAX_DIMENSION) {
-          finalScale = MAX_DIMENSION / targetWidth;
-        }
-
-        canvas.width = targetWidth * finalScale;
-        canvas.height = totalHeight * finalScale;
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        let y = 0;
-
-        for (const scaled of scaledImages) {
-          const crop = scaled.item.cropData;
-
-          // Apply the scale to the drawing dimensions
-          const drawWidth = scaled.width * finalScale;
-          const drawHeight = scaled.height * finalScale;
-
-          if (crop) {
-            ctx.drawImage(
-              scaled.item.img,
-              crop.x,
-              crop.y,
-              crop.width,
-              crop.height,
-              0,
-              y,
-              drawWidth,
-              drawHeight,
-            );
-          } else {
-            ctx.drawImage(scaled.item.img, 0, y, drawWidth, drawHeight);
-          }
-
-          // Increment y by the scaled height so the next image starts in the right spot!
-          y += drawHeight;
-        }
+              if (crop) {
+                ctx.drawImage(
+                  scaled.item.img,
+                  crop.x,
+                  crop.y,
+                  crop.width,
+                  crop.height,
+                  0,
+                  y,
+                  drawWidth,
+                  drawHeight,
+                );
+              } else {
+                ctx.drawImage(scaled.item.img, 0, y, drawWidth, drawHeight);
+              }
+              y += drawHeight;
+            }
+        }, 50); // Small timeout to allow DOM to render toast
       }
 
       function combineHorizontal() {
+        const activeImages = images.filter((item) => item.selected);
+        if (activeImages.length === 0) {
+            showToast("Please select photos first", true);
+            clearCanvas();
+            return;
+        }
+
         combineMode = "horizontal";
         canvas.style.display = "block";
 
-        const activeImages = images.filter((item) => item.selected);
+        // FIX: Provide UI feedback and yield to main thread
+        showToast("Processing layout...");
+        
+        setTimeout(() => {
+            const heights = activeImages.map((item) => {
+              if (item.cropData) return item.cropData.height;
+              return item.img.height;
+            });
 
-        if (activeImages.length === 0) {
-          clearCanvas();
-          return;
-        }
+            const targetHeight = Math.max(...heights);
+            let totalWidth = 0;
+            const scaledImages = [];
 
-        const heights = activeImages.map((item) => {
-          if (item.cropData) return item.cropData.height;
-          return item.img.height;
-        });
+            for (const item of activeImages) {
+              let sourceWidth = item.img.width;
+              let sourceHeight = item.img.height;
 
-        const targetHeight = Math.max(...heights);
-        let totalWidth = 0;
-        const scaledImages = [];
+              if (item.cropData) {
+                sourceWidth = item.cropData.width;
+                sourceHeight = item.cropData.height;
+              }
 
-        for (const item of activeImages) {
-          let sourceWidth = item.img.width;
-          let sourceHeight = item.img.height;
+              const scale = targetHeight / sourceHeight;
+              const scaledWidth = sourceWidth * scale;
 
-          if (item.cropData) {
-            sourceWidth = item.cropData.width;
-            sourceHeight = item.cropData.height;
-          }
+              scaledImages.push({
+                item,
+                width: scaledWidth,
+                height: targetHeight,
+              });
 
-          const scale = targetHeight / sourceHeight;
-          const scaledWidth = sourceWidth * scale;
+              totalWidth += scaledWidth;
+            }
 
-          scaledImages.push({
-            item,
-            width: scaledWidth,
-            height: targetHeight,
-          });
+            const MAX_CANVAS_AREA = 16000000;
+            const MAX_DIMENSION = 8000;
+            const currentArea = totalWidth * targetHeight;
+            let finalScale = 1;
 
-          totalWidth += scaledWidth;
-        }
+            if (currentArea > MAX_CANVAS_AREA) {
+              finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
+            }
+            if (totalWidth * finalScale > MAX_DIMENSION) {
+              finalScale = MAX_DIMENSION / totalWidth;
+            }
+            if (targetHeight * finalScale > MAX_DIMENSION) {
+              finalScale = MAX_DIMENSION / targetHeight;
+            }
 
-        // --- SAFETY SCALE CHECK ---
-        const MAX_CANVAS_AREA = 16000000;
-        const MAX_DIMENSION = 8000; // FIX: Apple's strict height/width limit
-        const currentArea = totalWidth * targetHeight;
-        let finalScale = 1;
+            canvas.width = totalWidth * finalScale;
+            canvas.height = targetHeight * finalScale;
 
-        // 1. Check total area
-        if (currentArea > MAX_CANVAS_AREA) {
-          finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
-        }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let x = 0;
 
-        // 2. Check maximum iOS width limit
-        if (totalWidth * finalScale > MAX_DIMENSION) {
-          finalScale = MAX_DIMENSION / totalWidth;
-        }
+            for (const scaled of scaledImages) {
+              const crop = scaled.item.cropData;
+              const drawWidth = scaled.width * finalScale;
+              const drawHeight = scaled.height * finalScale;
 
-        // 3. Check maximum iOS height limit
-        if (targetHeight * finalScale > MAX_DIMENSION) {
-          finalScale = MAX_DIMENSION / targetHeight;
-        }
-
-        canvas.width = totalWidth * finalScale;
-        canvas.height = targetHeight * finalScale;
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        let x = 0;
-
-        for (const scaled of scaledImages) {
-          const crop = scaled.item.cropData;
-
-          // Apply the scale to the drawing dimensions
-          const drawWidth = scaled.width * finalScale;
-          const drawHeight = scaled.height * finalScale;
-
-          if (crop) {
-            ctx.drawImage(
-              scaled.item.img,
-              crop.x,
-              crop.y,
-              crop.width,
-              crop.height,
-              x,
-              0,
-              drawWidth,
-              drawHeight,
-            );
-          } else {
-            ctx.drawImage(scaled.item.img, x, 0, drawWidth, drawHeight);
-          }
-
-          // Increment x by the scaled width!
-          x += drawWidth;
-        }
+              if (crop) {
+                ctx.drawImage(
+                  scaled.item.img,
+                  crop.x,
+                  crop.y,
+                  crop.width,
+                  crop.height,
+                  x,
+                  0,
+                  drawWidth,
+                  drawHeight,
+                );
+              } else {
+                ctx.drawImage(scaled.item.img, x, 0, drawWidth, drawHeight);
+              }
+              x += drawWidth;
+            }
+        }, 50);
       }
 
       function saveCropState() {
         if (!cropper || isRestoringHistory) return;
-
         const state = cropper.getData();
+        const key = cropMode === "combined" ? "combined" : images[currentCropIndex].id;
 
-        const key =
-          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
-
-        if (!cropHistory[key]) {
-          cropHistory[key] = [];
-        }
-
-        if (!redoHistory[key]) {
-          redoHistory[key] = [];
-        }
+        if (!cropHistory[key]) cropHistory[key] = [];
+        if (!redoHistory[key]) redoHistory[key] = [];
 
         const history = cropHistory[key];
-
         const last = history[history.length - 1];
 
-        // avoid duplicate saves
-        if (last && JSON.stringify(last) === JSON.stringify(state)) {
-          return;
-        }
-
+        if (last && JSON.stringify(last) === JSON.stringify(state)) return;
         history.push(JSON.parse(JSON.stringify(state)));
 
-        if (history.length > 50) {
-          history.shift();
-        }
-
+        if (history.length > 50) history.shift();
         redoHistory[key] = [];
       }
 
       function openCrop(index) {
         cropMode = "image";
         currentCropIndex = index;
-
         const modal = document.getElementById("cropModal");
         const cropImage = document.getElementById("cropImage");
 
-        // FIX: Clear previous cropper and image to prevent flash
         if (cropper) {
           cropper.destroy();
           cropper = null;
         }
         cropImage.removeAttribute("src");
-
         modal.style.display = "flex";
 
         cropImage.onload = () => {
@@ -969,14 +906,12 @@
             dragMode: "move",
             modal: true,
             restore: false,
-            checkOrientation: true /* FIX: Changed from false to true to fix mobile rotation */,
+            checkOrientation: true,
             ready() {
               const savedCrop = images[index].cropData;
-
               if (savedCrop) {
                 cropper.setData(savedCrop);
               }
-
               const key = images[currentCropIndex].id;
               cropHistory[key] = [
                 JSON.parse(JSON.stringify(cropper.getData())),
@@ -985,7 +920,6 @@
             },
           });
         };
-
         cropImage.src = images[index].original;
       }
 
@@ -993,23 +927,18 @@
         if (canvas.width <= 1 || canvas.height <= 1) return;
         cropMode = "combined";
         currentCropIndex = null;
-
         const modal = document.getElementById("cropModal");
         const cropImage = document.getElementById("cropImage");
 
-        // FIX 1: Prevent "ghost image" flickering by clearing previous state
         if (cropper) {
           cropper.destroy();
           cropper = null;
         }
-        cropImage.removeAttribute("src"); // Clear the image element completely
-
+        cropImage.removeAttribute("src");
         modal.style.display = "flex";
 
-        // FIX 2: Use asynchronous toBlob to prevent freezing the UI thread on mobile
         canvas.toBlob((blob) => {
           const url = URL.createObjectURL(blob);
-
           cropImage.onload = () => {
             cropper = new Cropper(cropImage, {
               minContainerWidth: 300,
@@ -1022,8 +951,6 @@
                   JSON.parse(JSON.stringify(cropper.getData())),
                 ];
                 redoHistory["combined"] = [];
-
-                // FIX 3: Revoke the object URL to free up mobile memory once Cropper is ready
                 URL.revokeObjectURL(url);
               },
               viewMode: 0,
@@ -1041,14 +968,12 @@
               cropBoxResizable: true,
             });
           };
-
           cropImage.src = url;
         }, "image/png");
       }
 
       function applyCrop() {
         if (!cropper) return;
-
         if (cropMode === "combined") {
           applyCombinedCrop();
           return;
@@ -1078,65 +1003,44 @@
 
       function resetCrop() {
         if (!cropper) return;
-
         cropper.reset();
-
         if (cropMode === "image" && currentCropIndex !== null) {
           images[currentCropIndex].cropData = null;
           images[currentCropIndex].current = images[currentCropIndex].original;
-
           rerenderCanvas();
           renderPreview();
         }
       }
 
       function undoCrop() {
-        const key =
-          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
-
+        const key = cropMode === "combined" ? "combined" : images[currentCropIndex].id;
         const history = cropHistory[key];
 
         if (!history || history.length < 2) return;
-
         const current = history.pop();
-
-        if (!redoHistory[key]) {
-          redoHistory[key] = [];
-        }
-
+        if (!redoHistory[key]) redoHistory[key] = [];
+        
         redoHistory[key].push(current);
-
         const previous = history[history.length - 1];
 
         isRestoringHistory = true;
-
         cropper.setData(previous);
-
         setTimeout(() => {
           isRestoringHistory = false;
         }, 50);
       }
 
       function redoCrop() {
-        const key =
-          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
-
+        const key = cropMode === "combined" ? "combined" : images[currentCropIndex].id;
         const redo = redoHistory[key];
 
         if (!redo || redo.length === 0) return;
-
         const next = redo.pop();
-
-        if (!cropHistory[key]) {
-          cropHistory[key] = [];
-        }
-
+        if (!cropHistory[key]) cropHistory[key] = [];
+        
         cropHistory[key].push(next);
-
         isRestoringHistory = true;
-
         cropper.setData(next);
-
         setTimeout(() => {
           isRestoringHistory = false;
         }, 50);
@@ -1154,9 +1058,7 @@
       function saveCanvasAsGroup() {
         if (canvas.width === 0 || canvas.height === 0) return;
 
-        // FIX: Use async toBlob to prevent freezing on mobile
         canvas.toBlob((blob) => {
-          // FIX: Add safety check in case the device still rejects the massive image
           if (!blob) {
             alert(
               "This group is too large for the device's memory. Try exporting to PDF/JPG directly, or group fewer photos at a time.",
@@ -1168,7 +1070,6 @@
           const img = new Image();
 
           img.onload = () => {
-            // remove selected images completely AND clear their memory
             images = images.filter((item) => {
               if (item.selected) {
                 if (item.original && item.original.startsWith("blob:")) {
@@ -1179,7 +1080,6 @@
               return true;
             });
 
-            // add reusable group
             images.push({
               id:
                 window.crypto && window.crypto.randomUUID
@@ -1194,7 +1094,6 @@
               selected: true,
             });
 
-            // clear orphan histories
             const validIds = new Set(images.map((img) => img.id));
 
             for (const key in cropHistory) {
@@ -1209,7 +1108,6 @@
               }
             }
 
-            // FIX: Reset the mode and redraw the canvas so it safely displays your new group!
             combineMode = null;
             renderPreview();
             rerenderCanvas();
@@ -1219,29 +1117,27 @@
         }, "image/png");
       }
 
-      // --- NEW BANNER FUNCTION ---
       let toastTimeout;
       function showToast(message, isError = false) {
         const toast = document.getElementById("toastNotification");
-
-        // Set colors and icons based on success or error
         toast.style.background = isError ? "#ef4444" : "#10b981";
         toast.innerHTML = isError ? `❌ ${message}` : `✅ ${message}`;
-
         toast.classList.add("show");
 
-        // Hide the banner automatically after 3 seconds
         clearTimeout(toastTimeout);
         toastTimeout = setTimeout(() => {
           toast.classList.remove("show");
         }, 3000);
       }
 
-      // --- UPDATED EXPORT FUNCTIONS ---
-      async function downloadImage() {
-        if (canvas.width <= 1 || canvas.height <= 1) return;
+      // FIX: Added 'e' parameter to fix Firefox reference error
+      async function downloadImage(e) {
+        if (canvas.width <= 1 || canvas.height <= 1) {
+            showToast("Nothing to export. Combine images first.", true);
+            return;
+        }
 
-        const btn = event.target;
+        const btn = e.target;
         const originalText = btn.innerText;
         btn.innerText = "Processing...";
         btn.style.opacity = "0.7";
@@ -1257,12 +1153,9 @@
           link.download = `PicStitch_${Date.now()}.jpg`;
           link.href = canvas.toDataURL("image/jpeg", quality);
           link.click();
-
-          // Show Success Banner!
           showToast("Image Saved Successfully!");
         } catch (error) {
           console.error("Export failed:", error);
-          // Show Error Banner instead of standard alert!
           showToast("File too large for device memory", true);
         } finally {
           btn.innerText = originalText;
@@ -1271,10 +1164,14 @@
         }
       }
 
-      async function exportPDF() {
-        if (canvas.width <= 1 || canvas.height <= 1) return;
+      // FIX: Added 'e' parameter to fix Firefox reference error
+      async function exportPDF(e) {
+        if (canvas.width <= 1 || canvas.height <= 1) {
+            showToast("Nothing to export. Combine images first.", true);
+            return;
+        }
 
-        const btn = event.target;
+        const btn = e.target;
         const originalText = btn.innerText;
         btn.innerText = "Processing...";
         btn.style.opacity = "0.7";
@@ -1297,7 +1194,6 @@
           const imgData = canvas.toDataURL("image/jpeg", 0.75);
           pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
           
-          // FIX: Bypass jsPDF's built-in save method to prevent security warnings
           const pdfBlob = pdf.output("blob");
           const url = URL.createObjectURL(pdfBlob);
           
@@ -1305,15 +1201,11 @@
           link.download = `PicStitch_${Date.now()}.pdf`;
           link.href = url;
           
-          // Appending to the body temporarily is the most secure way for all browsers
           document.body.appendChild(link); 
           link.click();
           document.body.removeChild(link);
           
-          // Clean up the memory safely
           setTimeout(() => URL.revokeObjectURL(url), 100);
-          
-          // Show Success Banner!
           showToast("PDF Saved Successfully!");
         } catch (error) {
           console.error("Export failed:", error);
