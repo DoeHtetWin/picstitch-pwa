@@ -25,14 +25,14 @@
         MobileDragDrop.polyfill({
           dragImageTranslateOverride:
             MobileDragDrop.scrollBehaviourDragImageTranslateOverride,
-            holdToDrag: 300, // FIX: Wait 300ms before dragging so normal scrolling works!
-            forceApply: true // FIX 1: Force the polyfill to override Apple's broken native drag!
-          });
+          holdToDrag: 300, // FIX: Wait 300ms before dragging so normal scrolling works!
+          forceApply: true, // FIX 1: Force the polyfill to override Apple's broken native drag!
+        });
 
         // FIX 2: Stop the iOS magnifying glass/menu from breaking the long-press
-        window.addEventListener('contextmenu', (event) => {
-            event.preventDefault();
-        }); 
+        window.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+        });
       });
     </script>
     <script src="cropper.min.js"></script>
@@ -413,6 +413,32 @@
           opacity: 1;
         }
       }
+
+      /* --- TOAST NOTIFICATION BANNER --- */
+      .toast {
+        position: fixed;
+        top: -100px; /* Hidden off-screen initially */
+        left: 50%;
+        transform: translateX(-50%);
+        background: #4f46e5;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 30px;
+        font-size: 15px;
+        font-weight: 600;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+        z-index: 9999999;
+        transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+      }
+
+      .toast.show {
+        /* Drops down just below the mobile notch */
+        top: calc(env(safe-area-inset-top, 20px) + 20px);
+      }
     </style>
   </head>
 
@@ -478,6 +504,7 @@
         <button onclick="resetCrop()">Reset</button>
       </div>
     </div>
+    <div id="toastNotification" class="toast"></div>
 
     <script>
       let cropper = null;
@@ -576,7 +603,7 @@
             renderPreview(); // FIX: Re-render instantly to recalculate all numbers!
             rerenderCanvas();
           });
-          
+
           deleteBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             removeImage(index);
@@ -1124,41 +1151,6 @@
         }
       }
 
-      async function downloadImage() {
-        if (canvas.width <= 1 || canvas.height <= 1) return;
-
-        // 1. Grab the button and show a loading state
-        const btn = event.target;
-        const originalText = btn.innerText;
-        btn.innerText = "Processing...";
-        btn.style.opacity = "0.7";
-        btn.disabled = true;
-
-        // 2. Force the browser to pause for a split second to update the button UI
-        await new Promise((resolve) => setTimeout(resolve, 50));
-
-        try {
-          const quality = Number(
-            document.getElementById("qualitySelect").value,
-          );
-          const link = document.createElement("a");
-          // Standardized the naming convention to match the PDF
-          link.download = `PicStitch_${Date.now()}.jpg`;
-          link.href = canvas.toDataURL("image/jpeg", quality);
-          link.click();
-        } catch (error) {
-          console.error("Export failed:", error);
-          alert(
-            "The export failed. The file might be too large for the device memory.",
-          );
-        } finally {
-          // 3. Always restore the button, even if it fails
-          btn.innerText = originalText;
-          btn.style.opacity = "1";
-          btn.disabled = false;
-        }
-      }
-
       function saveCanvasAsGroup() {
         if (canvas.width === 0 || canvas.height === 0) return;
 
@@ -1227,17 +1219,67 @@
         }, "image/png");
       }
 
-      async function exportPDF() {
+      // --- NEW BANNER FUNCTION ---
+      let toastTimeout;
+      function showToast(message, isError = false) {
+        const toast = document.getElementById("toastNotification");
+
+        // Set colors and icons based on success or error
+        toast.style.background = isError ? "#ef4444" : "#10b981";
+        toast.innerHTML = isError ? `❌ ${message}` : `✅ ${message}`;
+
+        toast.classList.add("show");
+
+        // Hide the banner automatically after 3 seconds
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+          toast.classList.remove("show");
+        }, 3000);
+      }
+
+      // --- UPDATED EXPORT FUNCTIONS ---
+      async function downloadImage() {
         if (canvas.width <= 1 || canvas.height <= 1) return;
 
-        // 1. Grab the button and show a loading state
         const btn = event.target;
         const originalText = btn.innerText;
         btn.innerText = "Processing...";
         btn.style.opacity = "0.7";
         btn.disabled = true;
 
-        // 2. Force the browser to pause for a split second to update the button UI
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        try {
+          const quality = Number(
+            document.getElementById("qualitySelect").value,
+          );
+          const link = document.createElement("a");
+          link.download = `PicStitch_${Date.now()}.jpg`;
+          link.href = canvas.toDataURL("image/jpeg", quality);
+          link.click();
+
+          // Show Success Banner!
+          showToast("Image Saved Successfully!");
+        } catch (error) {
+          console.error("Export failed:", error);
+          // Show Error Banner instead of standard alert!
+          showToast("File too large for device memory", true);
+        } finally {
+          btn.innerText = originalText;
+          btn.style.opacity = "1";
+          btn.disabled = false;
+        }
+      }
+
+      async function exportPDF() {
+        if (canvas.width <= 1 || canvas.height <= 1) return;
+
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = "Processing...";
+        btn.style.opacity = "0.7";
+        btn.disabled = true;
+
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         try {
@@ -1254,14 +1296,29 @@
 
           const imgData = canvas.toDataURL("image/jpeg", 0.75);
           pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-          pdf.save(`PicStitch_${Date.now()}.pdf`);
+          
+          // FIX: Bypass jsPDF's built-in save method to prevent security warnings
+          const pdfBlob = pdf.output("blob");
+          const url = URL.createObjectURL(pdfBlob);
+          
+          const link = document.createElement("a");
+          link.download = `PicStitch_${Date.now()}.pdf`;
+          link.href = url;
+          
+          // Appending to the body temporarily is the most secure way for all browsers
+          document.body.appendChild(link); 
+          link.click();
+          document.body.removeChild(link);
+          
+          // Clean up the memory safely
+          setTimeout(() => URL.revokeObjectURL(url), 100);
+          
+          // Show Success Banner!
+          showToast("PDF Saved Successfully!");
         } catch (error) {
           console.error("Export failed:", error);
-          alert(
-            "The export failed. The file might be too large for the device memory.",
-          );
+          showToast("File too large for device memory", true);
         } finally {
-          // 3. Always restore the button, even if it fails
           btn.innerText = originalText;
           btn.style.opacity = "1";
           btn.disabled = false;
