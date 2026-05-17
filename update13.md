@@ -8,4 +8,5 @@ can test with Local Wi-Fi Test (Ultimate Real-World Test) (achieve with this cod
     - Run your local server: Assuming you are using an extension like VS Code's "Live Server" to view your files, note the port number it runs on (usually 5500).
     - Open your phone: Connect your phone to the same Wi-Fi as your computer. Open Safari or Chrome on your phone and type in the IP address and port together, like this: http://192.168.1.15:5500.
 
+
 Implement App's Preview List (The Small Thumbnails)
