@@ -1,72 +1,47 @@
-const CACHE_NAME = 'picstitch-v9'
+const CACHE_NAME = "picstitch-v9";
 
 const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json',
-  './cropper.min.css',
-  './cropper.min.js',
-  './jspdf.umd.min.js'
-]
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./cropper.min.css",
+  "./cropper.min.js",
+  "./jspdf.umd.min.js",
+  "./mobile-drag-drop.css", /* <-- Add your new CSS file here */
+  "./mobile-drag-drop.js", /* <-- Add your new JS file here */
+  './image/icon-192.png'
+];
 
-self.addEventListener(
-  'install',
-  event => {
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
 
-    self.skipWaiting()
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(urlsToCache);
+    }),
+  );
+});
 
-    event.waitUntil(
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        }),
+      );
+    }),
+  );
 
-      caches.open(CACHE_NAME)
-        .then(cache => {
+  self.clients.claim();
+});
 
-          return cache.addAll(
-            urlsToCache
-          )
-        })
-    )
-  }
-)
-
-self.addEventListener(
-  'activate',
-  event => {
-
-    event.waitUntil(
-
-      caches.keys().then(keys => {
-
-        return Promise.all(
-
-          keys.map(key => {
-
-            if(key !== CACHE_NAME){
-
-              return caches.delete(key)
-            }
-          })
-        )
-      })
-    )
-
-    self.clients.claim()
-  }
-)
-
-self.addEventListener(
-  'fetch',
-  event => {
-
-    event.respondWith(
-
-      caches.match(event.request)
-        .then(response => {
-
-          return (
-            response ||
-            fetch(event.request)
-          )
-        })
-    )
-  }
-)
+self.addEventListener("fetch", (event) => {
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
+    }),
+  );
+});
