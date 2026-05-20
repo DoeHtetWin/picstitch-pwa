@@ -15,6 +15,8 @@ can test with Local Wi-Fi Test (Ultimate Real-World Test) (achieve with this cod
 - Add banner notifications for export jpg and pdf
 - iOS offline bug fixed
 
+update 15
+
 Key changes applied:
 
 - Firefox/Cross-Platform Bug Fix: Added the explicit event parameter to the HTML buttons and JavaScript export functions (downloadImage(event) and exportPDF(event)) so it no longer throws a reference error.
@@ -28,6 +30,7 @@ Key changes applied:
 - Empty States & Feedback (UX): Added toast notifications when images start loading, and warning toasts if you click export/combine without selecting any photos.
 
 update 16
+
 
 Your current:
 
@@ -74,3 +77,9 @@ revoke object URLs
 lock processing
 lock combining
 cleanup crop modal
+
+update 18
+Adding Free Form Crop
+
+update 19
+Crop UI changes
