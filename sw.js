@@ -1,5 +1,5 @@
 // Change this number EVERY time you update the app!
-const CACHE_NAME = "picstitch-v17"; 
+const CACHE_NAME = "picstitch-v14"; 
 
 // CRITICAL: Every single file must be spelled perfectly. 
 // If even one file is missing, iOS will refuse to work offline.
@@ -12,7 +12,7 @@ const ASSETS_TO_CACHE = [
   "./mobile-drag-drop.js",
   "./cropper.min.js",
   "./jspdf.umd.min.js",
-  "./image/icon-192.png" // Make sure this folder and file exist!
+  "./image/logo-192.png" // Make sure this folder and file exist!
 ];
 
 // Step 1: Install the Service Worker and download the files into memory
