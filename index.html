@@ -204,6 +204,8 @@
         overflow: hidden;
         border: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        transform: translateZ(0);
+        will-change: transform;
       }
 
       .preview-item img {
@@ -268,6 +270,8 @@
 
       canvas {
         width: 100%;
+        height: auto;
+        object-fit: contain;
         border-radius: 12px;
         display: none;
         background: transparent;
@@ -320,6 +324,7 @@
         background: #000;
         min-height: 0;
         min-width: 0;
+        transform: translateZ(0);
       }
 
       .crop-controls {
@@ -384,8 +389,12 @@
       }
 
       @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
       }
 
       .toast {
@@ -430,16 +439,16 @@
         <button onclick="combineVertical()">Vertical</button>
         <button onclick="combineHorizontal()">Horizontal</button>
         <button onclick="saveCanvasAsGroup()">Save Group</button>
-        <button onclick="downloadImage(event)">Export JPG</button>
+        <button onclick="downloadImage(event)">Export Image</button>
         <button onclick="exportPDF(event)">Export PDF</button>
       </div>
 
       <div class="slider-group custom-select-wrapper">
         <label for="qualitySelect">Export Quality:</label>
         <select id="qualitySelect" class="modern-select">
-          <option value="0.5">Good (~50%)</option>
-          <option value="0.8" selected>Better (~80%)</option>
-          <option value="1">Best (~100%)</option>
+          <option value="0.6">Good (Small JPG)</option>
+          <option value="0.8">Better (High JPG)</option>
+          <option value="1" selected>Best (Lossless PNG)</option>
         </select>
       </div>
 
@@ -488,11 +497,37 @@
       let combineMode = null;
       let isRestoringHistory = false;
       let draggedIndex = null;
+      let isProcessing = false;
+      let isCombining = false;
 
       const imageInput = document.getElementById("imageInput");
       const previewList = document.getElementById("previewList");
       const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", {
+        alpha: false,
+        desynchronized: true,
+        willReadFrequently: false,
+      });
+
+      // DEVICE LIMITS FOR HIGH-END DEVICES
+      function getDeviceLimits() {
+        const ua = navigator.userAgent;
+        const isIOS =
+          /iPad|iPhone|iPod/.test(ua) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+        if (isIOS) {
+          return { area: 16777216, dimension: 8192 };
+        }
+
+        if (/android/i.test(ua)) {
+          // FIX: Lowered dimension to 8192 to prevent Android preview stretching
+          return { area: 40000000, dimension: 8192 };
+        }
+
+        // Desktop Windows/Mac limits
+        return { area: 64000000, dimension: 16384 };
+      }
 
       canvas.addEventListener("click", () => {
         if (canvas.width <= 1 || canvas.height <= 1) return;
@@ -503,45 +538,64 @@
         const files = [...e.target.files];
         if (files.length === 0) return;
 
-        // FIX: Memory limit safeguard
         if (images.length + files.length > 20) {
           showToast("Maximum of 20 images allowed to protect memory.", true);
           e.target.value = "";
           return;
         }
 
-        // FIX: Loading feedback
         showToast("Loading images...");
+        const loadedImages = [];
 
-        const loadedImages = await Promise.all(
-          files.map((file) => {
-            return new Promise((resolve) => {
-              const objectUrl = URL.createObjectURL(file);
-              const img = new Image();
+        for (const file of files) {
+          try {
+            if (file.size > 25 * 1024 * 1024) {
+              showToast("Image too large. Please use images below 25MB.", true);
+              continue;
+            }
+            const objectUrl = URL.createObjectURL(file);
+            const img = new Image();
 
-              img.onload = () => {
-                resolve({
-                  id:
-                    window.crypto && window.crypto.randomUUID
-                      ? window.crypto.randomUUID()
-                      : Date.now().toString(36) +
-                        Math.random().toString(36).substring(2),
-                  original: objectUrl,
-                  current: objectUrl,
-                  img,
-                  cropData: null,
-                  selected: true,
-                });
-              };
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = reject;
               img.src = objectUrl;
             });
-          }),
-        );
+
+            let bitmap = null;
+            if ("createImageBitmap" in window) {
+              try {
+                bitmap = await createImageBitmap(img);
+              } catch (e) {
+                bitmap = null;
+              }
+            }
+
+            loadedImages.push({
+              id:
+                window.crypto && window.crypto.randomUUID
+                  ? window.crypto.randomUUID()
+                  : Date.now().toString(36) +
+                    Math.random().toString(36).substring(2),
+              original: objectUrl,
+              current: objectUrl,
+              img,
+              bitmap,
+              cropData: null,
+              selected: true,
+            });
+
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+          } catch (error) {
+            console.error("Image load failed:", error);
+          }
+        }
 
         images.push(...loadedImages);
         renderPreview();
         rerenderCanvas();
         e.target.value = "";
+        showToast("Images Loaded!");
       });
 
       clearCanvas();
@@ -573,6 +627,9 @@
 
           badge.addEventListener("click", (e) => {
             e.stopPropagation();
+            showToast(
+              item.selected ? "Deselecting Photo..." : "Selecting Photo...",
+            );
             item.selected = !item.selected;
             renderPreview();
             rerenderCanvas();
@@ -580,6 +637,7 @@
 
           deleteBtn.addEventListener("click", (e) => {
             e.stopPropagation();
+            showToast("Deleting Photo...");
             removeImage(index);
           });
 
@@ -589,18 +647,11 @@
 
           div.addEventListener("dragstart", () => {
             draggedIndex = index;
-            if (navigator.vibrate) {
-              navigator.vibrate(50);
-            }
+            if (navigator.vibrate) navigator.vibrate(50);
           });
 
-          div.addEventListener("dragover", (e) => {
-            e.preventDefault();
-          });
-
-          div.addEventListener("dragenter", (e) => {
-            e.preventDefault();
-          });
+          div.addEventListener("dragover", (e) => e.preventDefault());
+          div.addEventListener("dragenter", (e) => e.preventDefault());
 
           div.addEventListener("drop", (e) => {
             e.preventDefault();
@@ -619,14 +670,13 @@
 
       function removeImage(index) {
         const image = images[index];
-
         if (image.original && image.original.startsWith("blob:")) {
           URL.revokeObjectURL(image.original);
         }
-
         delete cropHistory[image.id];
         delete redoHistory[image.id];
 
+        if (image.bitmap) image.bitmap.close();
         images.splice(index, 1);
 
         if (currentCropIndex === index) {
@@ -641,24 +691,21 @@
         } else {
           rerenderCanvas();
         }
-
         renderPreview();
       }
 
       function rerenderCanvas() {
         const activeImages = images.filter((item) => item.selected);
-
         if (activeImages.length === 0) {
           clearCanvas();
           return;
         }
-
         if (combineMode === "vertical") {
-          combineVertical();
+          combineVertical(false);
         } else if (combineMode === "horizontal") {
-          combineHorizontal();
+          combineHorizontal(false);
         } else if (activeImages.length === 1) {
-          combineVertical();
+          combineVertical(false);
           combineMode = null;
         }
       }
@@ -670,192 +717,213 @@
         canvas.style.display = "none";
       }
 
-      function combineVertical() {
+      function combineVertical(showMessage = true) {
+        if (isCombining) return;
+        isCombining = true;
+
         const activeImages = images.filter((item) => item.selected);
         if (activeImages.length === 0) {
-            showToast("Please select photos first", true);
-            clearCanvas();
-            return;
+          showToast("Please select photos first", true);
+          clearCanvas();
+          isCombining = false;
+          return;
         }
 
         combineMode = "vertical";
         canvas.style.display = "block";
 
-        // FIX: Provide UI feedback and yield to main thread before heavy processing
-        showToast("Processing layout...");
-        
+        if (showMessage) showToast("Loading Vertical Stitch...");
+
         setTimeout(() => {
-            const widths = activeImages.map((item) => {
-              if (item.cropData) return item.cropData.width;
-              return item.img.width;
+          const widths = activeImages.map((item) => {
+            if (item.cropData) return item.cropData.width;
+            return item.img.width;
+          });
+
+          const targetWidth = Math.max(...widths);
+          let totalHeight = 0;
+          const scaledImages = [];
+
+          for (const item of activeImages) {
+            let sourceWidth = item.img.width;
+            let sourceHeight = item.img.height;
+
+            if (item.cropData) {
+              sourceWidth = item.cropData.width;
+              sourceHeight = item.cropData.height;
+            }
+
+            const scale = targetWidth / sourceWidth;
+            const scaledHeight = sourceHeight * scale;
+
+            scaledImages.push({
+              item,
+              width: targetWidth,
+              height: scaledHeight,
             });
 
-            const targetWidth = Math.max(...widths);
-            let totalHeight = 0;
-            const scaledImages = [];
+            totalHeight += scaledHeight;
+          }
 
-            for (const item of activeImages) {
-              let sourceWidth = item.img.width;
-              let sourceHeight = item.img.height;
+          const limits = getDeviceLimits();
+          const MAX_CANVAS_AREA = limits.area;
+          const MAX_DIMENSION = limits.dimension;
+          const currentArea = targetWidth * totalHeight;
 
-              if (item.cropData) {
-                sourceWidth = item.cropData.width;
-                sourceHeight = item.cropData.height;
-              }
+          let finalScale = 1;
+          if (currentArea > MAX_CANVAS_AREA) {
+            finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
+          }
+          if (totalHeight * finalScale > MAX_DIMENSION) {
+            finalScale = MAX_DIMENSION / totalHeight;
+          }
+          if (targetWidth * finalScale > MAX_DIMENSION) {
+            finalScale = MAX_DIMENSION / targetWidth;
+          }
 
-              const scale = targetWidth / sourceWidth;
-              const scaledHeight = sourceHeight * scale;
+          canvas.width = targetWidth * finalScale;
+          canvas.height = totalHeight * finalScale;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-              scaledImages.push({
-                item,
-                width: targetWidth,
-                height: scaledHeight,
-              });
+          let y = 0;
+          for (const scaled of scaledImages) {
+            const crop = scaled.item.cropData;
+            const drawWidth = scaled.width * finalScale;
+            const drawHeight = scaled.height * finalScale;
 
-              totalHeight += scaledHeight;
+            if (crop) {
+              ctx.drawImage(
+                scaled.item.bitmap || scaled.item.img,
+                crop.x,
+                crop.y,
+                crop.width,
+                crop.height,
+                0,
+                y,
+                drawWidth,
+                drawHeight,
+              );
+            } else {
+              ctx.drawImage(
+                scaled.item.bitmap || scaled.item.img,
+                0,
+                y,
+                drawWidth,
+                drawHeight,
+              );
             }
-
-            const MAX_CANVAS_AREA = 16000000;
-            const MAX_DIMENSION = 8000; 
-            const currentArea = targetWidth * totalHeight;
-            let finalScale = 1;
-
-            if (currentArea > MAX_CANVAS_AREA) {
-              finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
-            }
-            if (totalHeight * finalScale > MAX_DIMENSION) {
-              finalScale = MAX_DIMENSION / totalHeight;
-            }
-            if (targetWidth * finalScale > MAX_DIMENSION) {
-              finalScale = MAX_DIMENSION / targetWidth;
-            }
-
-            canvas.width = targetWidth * finalScale;
-            canvas.height = totalHeight * finalScale;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            let y = 0;
-
-            for (const scaled of scaledImages) {
-              const crop = scaled.item.cropData;
-              const drawWidth = scaled.width * finalScale;
-              const drawHeight = scaled.height * finalScale;
-
-              if (crop) {
-                ctx.drawImage(
-                  scaled.item.img,
-                  crop.x,
-                  crop.y,
-                  crop.width,
-                  crop.height,
-                  0,
-                  y,
-                  drawWidth,
-                  drawHeight,
-                );
-              } else {
-                ctx.drawImage(scaled.item.img, 0, y, drawWidth, drawHeight);
-              }
-              y += drawHeight;
-            }
-        }, 50); // Small timeout to allow DOM to render toast
+            y += drawHeight;
+          }
+          isCombining = false;
+        }, 50);
       }
 
-      function combineHorizontal() {
+      function combineHorizontal(showMessage = true) {
+        if (isCombining) return;
+        isCombining = true;
+
         const activeImages = images.filter((item) => item.selected);
         if (activeImages.length === 0) {
-            showToast("Please select photos first", true);
-            clearCanvas();
-            return;
+          showToast("Please select photos first", true);
+          clearCanvas();
+          isCombining = false;
+          return;
         }
 
         combineMode = "horizontal";
         canvas.style.display = "block";
 
-        // FIX: Provide UI feedback and yield to main thread
-        showToast("Processing layout...");
-        
+        if (showMessage) showToast("Loading Horizontal Stitch...");
+
         setTimeout(() => {
-            const heights = activeImages.map((item) => {
-              if (item.cropData) return item.cropData.height;
-              return item.img.height;
+          const heights = activeImages.map((item) => {
+            if (item.cropData) return item.cropData.height;
+            return item.img.height;
+          });
+
+          const targetHeight = Math.max(...heights);
+          let totalWidth = 0;
+          const scaledImages = [];
+
+          for (const item of activeImages) {
+            let sourceWidth = item.img.width;
+            let sourceHeight = item.img.height;
+
+            if (item.cropData) {
+              sourceWidth = item.cropData.width;
+              sourceHeight = item.cropData.height;
+            }
+
+            const scale = targetHeight / sourceHeight;
+            const scaledWidth = sourceWidth * scale;
+
+            scaledImages.push({
+              item,
+              width: scaledWidth,
+              height: targetHeight,
             });
 
-            const targetHeight = Math.max(...heights);
-            let totalWidth = 0;
-            const scaledImages = [];
+            totalWidth += scaledWidth;
+          }
 
-            for (const item of activeImages) {
-              let sourceWidth = item.img.width;
-              let sourceHeight = item.img.height;
+          const limits = getDeviceLimits();
+          const MAX_CANVAS_AREA = limits.area;
+          const MAX_DIMENSION = limits.dimension;
+          const currentArea = totalWidth * targetHeight;
 
-              if (item.cropData) {
-                sourceWidth = item.cropData.width;
-                sourceHeight = item.cropData.height;
-              }
+          let finalScale = 1;
+          if (currentArea > MAX_CANVAS_AREA) {
+            finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
+          }
+          if (totalWidth * finalScale > MAX_DIMENSION) {
+            finalScale = MAX_DIMENSION / totalWidth;
+          }
+          if (targetHeight * finalScale > MAX_DIMENSION) {
+            finalScale = MAX_DIMENSION / targetHeight;
+          }
 
-              const scale = targetHeight / sourceHeight;
-              const scaledWidth = sourceWidth * scale;
+          canvas.width = totalWidth * finalScale;
+          canvas.height = targetHeight * finalScale;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-              scaledImages.push({
-                item,
-                width: scaledWidth,
-                height: targetHeight,
-              });
+          let x = 0;
+          for (const scaled of scaledImages) {
+            const crop = scaled.item.cropData;
+            const drawWidth = scaled.width * finalScale;
+            const drawHeight = scaled.height * finalScale;
 
-              totalWidth += scaledWidth;
+            if (crop) {
+              ctx.drawImage(
+                scaled.item.bitmap || scaled.item.img,
+                crop.x,
+                crop.y,
+                crop.width,
+                crop.height,
+                x,
+                0,
+                drawWidth,
+                drawHeight,
+              );
+            } else {
+              ctx.drawImage(
+                scaled.item.bitmap || scaled.item.img,
+                x,
+                0,
+                drawWidth,
+                drawHeight,
+              );
             }
-
-            const MAX_CANVAS_AREA = 16000000;
-            const MAX_DIMENSION = 8000;
-            const currentArea = totalWidth * targetHeight;
-            let finalScale = 1;
-
-            if (currentArea > MAX_CANVAS_AREA) {
-              finalScale = Math.sqrt(MAX_CANVAS_AREA / currentArea);
-            }
-            if (totalWidth * finalScale > MAX_DIMENSION) {
-              finalScale = MAX_DIMENSION / totalWidth;
-            }
-            if (targetHeight * finalScale > MAX_DIMENSION) {
-              finalScale = MAX_DIMENSION / targetHeight;
-            }
-
-            canvas.width = totalWidth * finalScale;
-            canvas.height = targetHeight * finalScale;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            let x = 0;
-
-            for (const scaled of scaledImages) {
-              const crop = scaled.item.cropData;
-              const drawWidth = scaled.width * finalScale;
-              const drawHeight = scaled.height * finalScale;
-
-              if (crop) {
-                ctx.drawImage(
-                  scaled.item.img,
-                  crop.x,
-                  crop.y,
-                  crop.width,
-                  crop.height,
-                  x,
-                  0,
-                  drawWidth,
-                  drawHeight,
-                );
-              } else {
-                ctx.drawImage(scaled.item.img, x, 0, drawWidth, drawHeight);
-              }
-              x += drawWidth;
-            }
+            x += drawWidth;
+          }
+          isCombining = false;
         }, 50);
       }
 
       function saveCropState() {
         if (!cropper || isRestoringHistory) return;
         const state = cropper.getData();
-        const key = cropMode === "combined" ? "combined" : images[currentCropIndex].id;
+        const key =
+          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
 
         if (!cropHistory[key]) cropHistory[key] = [];
         if (!redoHistory[key]) redoHistory[key] = [];
@@ -937,39 +1005,44 @@
         cropImage.removeAttribute("src");
         modal.style.display = "flex";
 
-        canvas.toBlob((blob) => {
-          const url = URL.createObjectURL(blob);
-          cropImage.onload = () => {
-            cropper = new Cropper(cropImage, {
-              minContainerWidth: 300,
-              minContainerHeight: 300,
-              cropend() {
-                saveCropState();
-              },
-              ready() {
-                cropHistory["combined"] = [
-                  JSON.parse(JSON.stringify(cropper.getData())),
-                ];
-                redoHistory["combined"] = [];
-                URL.revokeObjectURL(url);
-              },
-              viewMode: 0,
-              autoCropArea: 1,
-              responsive: true,
-              background: false,
-              movable: true,
-              zoomable: true,
-              scalable: true,
-              rotatable: true,
-              guides: true,
-              center: true,
-              highlight: true,
-              cropBoxMovable: true,
-              cropBoxResizable: true,
-            });
-          };
-          cropImage.src = url;
-        }, "image/png");
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            cropImage.onload = () => {
+              cropper = new Cropper(cropImage, {
+                minContainerWidth: 300,
+                minContainerHeight: 300,
+                cropend() {
+                  saveCropState();
+                },
+                ready() {
+                  cropHistory["combined"] = [
+                    JSON.parse(JSON.stringify(cropper.getData())),
+                  ];
+                  redoHistory["combined"] = [];
+                  URL.revokeObjectURL(url);
+                },
+                viewMode: 0,
+                autoCropArea: 1,
+                responsive: true,
+                background: false,
+                movable: true,
+                zoomable: true,
+                scalable: true,
+                rotatable: true,
+                guides: true,
+                center: true,
+                highlight: true,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+              });
+            };
+            cropImage.src = url;
+          },
+          "image/webp",
+          0.9,
+        );
       }
 
       function applyCrop() {
@@ -981,15 +1054,29 @@
 
         const cropData = cropper.getData();
         images[currentCropIndex].cropData = cropData;
-
         const croppedCanvas = cropper.getCroppedCanvas();
-        const previewSrc = croppedCanvas.toDataURL("image/png");
 
-        images[currentCropIndex].current = previewSrc;
+        croppedCanvas.toBlob(
+          (blob) => {
+            const previewUrl = URL.createObjectURL(blob);
+            const oldCurrent = images[currentCropIndex].current;
 
-        rerenderCanvas();
-        renderPreview();
-        closeCrop();
+            if (
+              oldCurrent &&
+              oldCurrent.startsWith("blob:") &&
+              oldCurrent !== images[currentCropIndex].original
+            ) {
+              URL.revokeObjectURL(oldCurrent);
+            }
+
+            images[currentCropIndex].current = previewUrl;
+            rerenderCanvas();
+            renderPreview();
+            closeCrop();
+          },
+          "image/webp",
+          0.85,
+        );
       }
 
       function applyCombinedCrop() {
@@ -1013,13 +1100,14 @@
       }
 
       function undoCrop() {
-        const key = cropMode === "combined" ? "combined" : images[currentCropIndex].id;
+        const key =
+          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
         const history = cropHistory[key];
 
         if (!history || history.length < 2) return;
         const current = history.pop();
         if (!redoHistory[key]) redoHistory[key] = [];
-        
+
         redoHistory[key].push(current);
         const previous = history[history.length - 1];
 
@@ -1031,13 +1119,14 @@
       }
 
       function redoCrop() {
-        const key = cropMode === "combined" ? "combined" : images[currentCropIndex].id;
+        const key =
+          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
         const redo = redoHistory[key];
 
         if (!redo || redo.length === 0) return;
         const next = redo.pop();
         if (!cropHistory[key]) cropHistory[key] = [];
-        
+
         cropHistory[key].push(next);
         isRestoringHistory = true;
         cropper.setData(next);
@@ -1053,15 +1142,24 @@
           cropper.destroy();
           cropper = null;
         }
+        const cropImage = document.getElementById("cropImage");
+        cropImage.removeAttribute("src");
       }
 
       function saveCanvasAsGroup() {
-        if (canvas.width === 0 || canvas.height === 0) return;
+        if (isProcessing) return;
+        isProcessing = true;
+
+        if (canvas.width === 0 || canvas.height === 0) {
+          isProcessing = false;
+          return;
+        }
 
         canvas.toBlob((blob) => {
           if (!blob) {
+            isProcessing = false;
             alert(
-              "This group is too large for the device's memory. Try exporting to PDF/JPG directly, or group fewer photos at a time.",
+              "This group is too large for the device's memory. Try exporting directly, or group fewer photos at a time.",
             );
             return;
           }
@@ -1072,8 +1170,17 @@
           img.onload = () => {
             images = images.filter((item) => {
               if (item.selected) {
-                if (item.original && item.original.startsWith("blob:")) {
+                if (item.original?.startsWith("blob:")) {
                   URL.revokeObjectURL(item.original);
+                }
+                if (
+                  item.current?.startsWith("blob:") &&
+                  item.current !== item.original
+                ) {
+                  URL.revokeObjectURL(item.current);
+                }
+                if (item.bitmap) {
+                  item.bitmap.close();
                 }
                 return false;
               }
@@ -1095,13 +1202,11 @@
             });
 
             const validIds = new Set(images.map((img) => img.id));
-
             for (const key in cropHistory) {
               if (key !== "combined" && !validIds.has(key)) {
                 delete cropHistory[key];
               }
             }
-
             for (const key in redoHistory) {
               if (key !== "combined" && !validIds.has(key)) {
                 delete redoHistory[key];
@@ -1109,10 +1214,17 @@
             }
 
             combineMode = null;
+            clearCanvas();
             renderPreview();
-            rerenderCanvas();
-          };
 
+            if (images.length === 1) {
+              combineVertical(false);
+              combineMode = null;
+            }
+
+            showToast("Group Saved Successfully!");
+            isProcessing = false;
+          };
           img.src = dataUrl;
         }, "image/png");
       }
@@ -1120,25 +1232,51 @@
       let toastTimeout;
       function showToast(message, isError = false) {
         const toast = document.getElementById("toastNotification");
-        toast.style.background = isError ? "#ef4444" : "#10b981";
-        toast.innerHTML = isError ? `❌ ${message}` : `✅ ${message}`;
-        toast.classList.add("show");
-
         clearTimeout(toastTimeout);
-        toastTimeout = setTimeout(() => {
-          toast.classList.remove("show");
-        }, 3000);
+        toast.classList.remove("show");
+
+        requestAnimationFrame(() => {
+          toast.style.background = isError ? "#ef4444" : "#10b981";
+          toast.innerHTML = isError ? `❌ ${message}` : `✅ ${message}`;
+          requestAnimationFrame(() => {
+            toast.classList.add("show");
+            toastTimeout = setTimeout(() => {
+              toast.classList.remove("show");
+            }, 2000);
+          });
+        });
       }
 
-      // FIX: Added 'e' parameter to fix Firefox reference error
+      function validateCanvasSize() {
+        const limits = getDeviceLimits();
+        const pixels = canvas.width * canvas.height;
+
+        if (pixels > limits.area) {
+          throw new Error("Canvas too large for this specific device OS");
+        }
+      }
+
+      async function exportCanvasBlob(type, quality = 0.9) {
+        if ("OffscreenCanvas" in window) {
+          const offscreen = new OffscreenCanvas(canvas.width, canvas.height);
+          const offCtx = offscreen.getContext("2d");
+          offCtx.drawImage(canvas, 0, 0);
+          return await offscreen.convertToBlob({ type, quality });
+        }
+        return await new Promise((resolve) => {
+          canvas.toBlob(resolve, type, quality);
+        });
+      }
+
       async function downloadImage(e) {
         if (canvas.width <= 1 || canvas.height <= 1) {
-            showToast("Nothing to export. Combine images first.", true);
-            return;
+          showToast("Nothing to export. Combine images first.", true);
+          return;
         }
 
         const btn = e.target;
         const originalText = btn.innerText;
+
         btn.innerText = "Processing...";
         btn.style.opacity = "0.7";
         btn.disabled = true;
@@ -1146,13 +1284,27 @@
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         try {
-          const quality = Number(
+          validateCanvasSize();
+
+          const qualityValue = Number(
             document.getElementById("qualitySelect").value,
           );
+
+          // ACTUAL PNG FIX: Export as Lossless PNG if user selects 'Best' (1)
+          const exportFormat = qualityValue === 1 ? "image/png" : "image/jpeg";
+          const fileExtension = qualityValue === 1 ? "png" : "jpg";
+
+          const blob = await exportCanvasBlob(exportFormat, qualityValue);
+          const url = URL.createObjectURL(blob);
           const link = document.createElement("a");
-          link.download = `PicStitch_${Date.now()}.jpg`;
-          link.href = canvas.toDataURL("image/jpeg", quality);
+
+          link.download = `PicStitch_${Date.now()}.${fileExtension}`;
+          link.href = url;
           link.click();
+
+          setTimeout(() => {
+            URL.revokeObjectURL(url);
+          }, 1000);
           showToast("Image Saved Successfully!");
         } catch (error) {
           console.error("Export failed:", error);
@@ -1164,11 +1316,10 @@
         }
       }
 
-      // FIX: Added 'e' parameter to fix Firefox reference error
       async function exportPDF(e) {
         if (canvas.width <= 1 || canvas.height <= 1) {
-            showToast("Nothing to export. Combine images first.", true);
-            return;
+          showToast("Nothing to export. Combine images first.", true);
+          return;
         }
 
         const btn = e.target;
@@ -1180,7 +1331,9 @@
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         try {
+          validateCanvasSize();
           const { jsPDF } = window.jspdf;
+
           const pdfWidth = 800;
           const scale = pdfWidth / canvas.width;
           const pdfHeight = canvas.height * scale;
@@ -1191,21 +1344,33 @@
             format: [pdfWidth, pdfHeight],
           });
 
-          const imgData = canvas.toDataURL("image/jpeg", 0.75);
-          pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-          
+          const blob = await exportCanvasBlob("image/jpeg", 0.75);
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = url;
+          });
+
+          pdf.addImage(img, "JPEG", 0, 0, pdfWidth, pdfHeight);
+          URL.revokeObjectURL(url);
+
           const pdfBlob = pdf.output("blob");
-          const url = URL.createObjectURL(pdfBlob);
-          
+          const pdfUrl = URL.createObjectURL(pdfBlob);
           const link = document.createElement("a");
+
           link.download = `PicStitch_${Date.now()}.pdf`;
-          link.href = url;
-          
-          document.body.appendChild(link); 
+          link.href = pdfUrl;
+
+          document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          
-          setTimeout(() => URL.revokeObjectURL(url), 100);
+
+          setTimeout(() => {
+            URL.revokeObjectURL(pdfUrl);
+          }, 1000);
           showToast("PDF Saved Successfully!");
         } catch (error) {
           console.error("Export failed:", error);
@@ -1218,8 +1383,27 @@
       }
 
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./sw.js");
+        navigator.serviceWorker.register("./sw.js").catch((err) => {
+          console.error("SW registration failed:", err);
+        });
       }
+
+      window.addEventListener("beforeunload", () => {
+        images.forEach((image) => {
+          if (image.original?.startsWith("blob:")) {
+            URL.revokeObjectURL(image.original);
+          }
+          if (
+            image.current?.startsWith("blob:") &&
+            image.current !== image.original
+          ) {
+            URL.revokeObjectURL(image.current);
+          }
+          if (image.bitmap) {
+            image.bitmap.close();
+          }
+        });
+      });
     </script>
   </body>
 </html>
