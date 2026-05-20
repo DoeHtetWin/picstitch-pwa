@@ -26,3 +26,51 @@ Key changes applied:
 - Drag-and-Drop Conflict (UX): Added touch-action: none; to .preview-item so scrolling down the page doesn't accidentally trigger a drag event on mobile devices.
 
 - Empty States & Feedback (UX): Added toast notifications when images start loading, and warning toasts if you click export/combine without selecting any photos.
+
+update 16
+
+Your current:
+
+toDataURL()
+freezes
+allocates giant strings
+
+New version:
+
+binary blobs
+lower memory
+faster export
+fewer Android crashes
+
+BIGGEST PERFORMANCE IMPROVEMENTS
+
+These replacements will significantly improve:
+
+Android memory usage
+export stability
+crop responsiveness
+large screenshot handling
+Redmi/Xiaomi browser stability
+mobile GPU rendering
+large canvas reliability
+export speed
+crash prevention
+
+Most important improvements:
+
+createImageBitmap()
+removing base64 previews
+OffscreenCanvas export
+blob-based export pipeline
+bitmap cleanup
+
+update 17
+
+Device-aware canvas limits // function getDeviceLimits()
+✅ Mobile safety improved
+
+clean bitmaps
+revoke object URLs
+lock processing
+lock combining
+cleanup crop modal
