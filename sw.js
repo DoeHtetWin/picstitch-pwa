@@ -1,5 +1,5 @@
 // Change this number EVERY time you update the app!
-const CACHE_NAME = "picstitch-v20.1"; 
+const CACHE_NAME = "picstitch-v20.2"; 
 
 // CRITICAL: Every single file must be spelled perfectly. 
 // If even one file is missing, iOS will refuse to work offline.
