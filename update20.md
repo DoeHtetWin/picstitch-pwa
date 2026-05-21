@@ -83,3 +83,6 @@ Adding Free Form Crop
 
 update 19
 Crop UI changes
+
+update 20
+Optimize text and UI changes
