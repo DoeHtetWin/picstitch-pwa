@@ -130,7 +130,7 @@
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         padding: 14px;
-        font-size: 15px;
+        font-size: 14.2px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
@@ -402,10 +402,17 @@
 
       .toast {
         position: fixed;
-        top: -100px;
+        /* Lock the final position in place */
+        top: calc(env(safe-area-inset-top, 20px) + 20px);
         left: 50%;
-        transform: translateX(-50%);
-        background: #4f46e5;
+        /* Start hidden slightly higher up */
+        transform: translate(-50%, -20px);
+        opacity: 0;
+        visibility: hidden;
+
+        background: rgba(30, 41, 59, 0.85);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         color: white;
         padding: 12px 24px;
         border-radius: 30px;
@@ -413,7 +420,13 @@
         font-weight: 600;
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
         z-index: 9999999;
-        transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        pointer-events: none; /* Prevents it from blocking your taps */
+
+        /* Smooth fade and slide for both appearing and disappearing */
+        transition:
+          transform 0.4s ease-out,
+          opacity 0.4s ease-out,
+          visibility 0.4s ease-out;
         display: flex;
         align-items: center;
         gap: 8px;
@@ -421,7 +434,10 @@
       }
 
       .toast.show {
-        top: calc(env(safe-area-inset-top, 20px) + 20px);
+        /* Drop into exact center and become fully visible */
+        transform: translate(-50%, 0);
+        opacity: 1;
+        visibility: visible;
       }
 
       /* MAGNIFIER */
@@ -495,8 +511,8 @@
       </div>
 
       <div class="controls">
-        <button onclick="combineVertical()">Vertical</button>
-        <button onclick="combineHorizontal()">Horizontal</button>
+        <button onclick="combineVertical()">Vertical Stitch</button>
+        <button onclick="combineHorizontal()">Horizontal Stitch</button>
         <button onclick="saveCanvasAsGroup()">Save Group</button>
         <button onclick="downloadImage(event)">Export Image</button>
         <button onclick="exportPDF(event)">Export PDF</button>
@@ -825,7 +841,7 @@
 
         const activeImages = images.filter((item) => item.selected);
         if (activeImages.length === 0) {
-          showToast("Please select photos first", true);
+          showToast("Please select images first", true);
           clearCanvas();
           isCombining = false;
           return;
@@ -905,7 +921,7 @@
 
         const activeImages = images.filter((item) => item.selected);
         if (activeImages.length === 0) {
-          showToast("Please select photos first", true);
+          showToast("Please select images first", true);
           clearCanvas();
           isCombining = false;
           return;
@@ -1864,7 +1880,7 @@
         if (isProcessing) return;
         isProcessing = true;
         if (canvas.width <= 1 || canvas.height <= 1) {
-          showToast("Nothing to Save", true);
+          showToast("Please stitch images first", true);
 
           isProcessing = false;
 
@@ -1932,21 +1948,39 @@
       }
 
       let toastTimeout;
+
+      // Failsafe: If iOS freezes the timeout, tapping anywhere forces it to hide
+      /* document.addEventListener(
+        "touchstart",
+        () => {
+          const toast = document.getElementById("toastNotification");
+          if (toast && toast.classList.contains("show")) {
+            toast.classList.remove("show");
+          }
+        },
+        { passive: true },
+      ); */
+
       function showToast(message, isError = false) {
         const toast = document.getElementById("toastNotification");
+
         clearTimeout(toastTimeout);
         toast.classList.remove("show");
 
-        requestAnimationFrame(() => {
-          toast.style.background = isError ? "#ef4444" : "#10b981";
-          toast.innerHTML = isError ? `❌ ${message}` : `✅ ${message}`;
-          requestAnimationFrame(() => {
-            toast.classList.add("show");
-            toastTimeout = setTimeout(() => {
-              toast.classList.remove("show");
-            }, 2000);
-          });
-        });
+        // Keep the text clean and white
+        toast.style.color = "#ffffff";
+        toast.innerHTML = isError ? `❌ ${message}` : `✅ ${message}`;
+
+        // Reset any background styling that might be lingering
+        toast.style.background = "";
+
+        void toast.offsetWidth;
+
+        toast.classList.add("show");
+
+        toastTimeout = setTimeout(() => {
+          toast.classList.remove("show");
+        }, 2000);
       }
 
       function validateCanvasSize() {
@@ -2008,66 +2042,74 @@
         }
       } */
 
-      async function downloadImage(e) {
+      async function exportPDF(e) {
         const btn = e.target;
-
         const originalText = btn.innerText;
-
         btn.innerText = "Processing...";
-
         btn.style.opacity = "0.7";
-
         btn.disabled = true;
 
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         try {
-          const qualityValue = Number(
-            document.getElementById("qualitySelect").value,
-          );
-
-          const exportFormat = qualityValue === 1 ? "image/png" : "image/jpeg";
-
-          const fileExtension = qualityValue === 1 ? "png" : "jpg";
+          const { jsPDF } = window.jspdf;
 
           // =========================================
-          // EXPORT COMBINED CANVAS
+          // 1. EXPORT COMBINED CANVAS (If stitched)
           // =========================================
           if (canvas.width > 1 && canvas.height > 1) {
             validateCanvasSize();
 
-            const blob = await exportCanvasBlob(exportFormat, qualityValue);
+            const pdfWidth = 800;
+            const scale = pdfWidth / canvas.width;
+            const pdfHeight = canvas.height * scale;
 
+            const pdf = new jsPDF({
+              orientation: pdfHeight > pdfWidth ? "portrait" : "landscape",
+              unit: "px",
+              format: [pdfWidth, pdfHeight],
+            });
+
+            const blob = await exportCanvasBlob("image/jpeg", 0.75);
             const url = URL.createObjectURL(blob);
+            const img = new Image();
 
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = reject;
+              img.src = url;
+            });
+
+            pdf.addImage(img, "JPEG", 0, 0, pdfWidth, pdfHeight);
+            URL.revokeObjectURL(url);
+
+            const pdfBlob = pdf.output("blob");
+            const pdfUrl = URL.createObjectURL(pdfBlob);
             const link = document.createElement("a");
+            link.download = `PicStitch_${Date.now()}.pdf`;
+            link.href = pdfUrl;
 
-            link.download = `PicStitch_${Date.now()}.${fileExtension}`;
-
-            link.href = url;
-
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
 
             setTimeout(() => {
-              URL.revokeObjectURL(url);
+              URL.revokeObjectURL(pdfUrl);
             }, 1000);
 
             if (!isIOS) {
-              showToast("Image Saved Successfully!");
+              showToast("PDF Saved Successfully!");
             }
-
             return;
           }
 
           // =========================================
-          // EXPORT SELECTED IMAGES
+          // 2. EXPORT SINGLE SELECTED PHOTO
           // =========================================
           const selectedImages = images.filter((img) => img.selected);
 
-          // IOS SAFARI MULTI-DOWNLOAD FIX
           if (selectedImages.length > 1) {
-            showToast("Select one photo or Stich photos", true);
-
+            showToast("Select one photo or Stitch photos", true);
             return;
           }
 
@@ -2076,99 +2118,58 @@
             return;
           }
 
-          for (let i = 0; i < selectedImages.length; i++) {
-            const imgObj = selectedImages[i];
+          const imgObj = selectedImages[0];
+          const img = new Image();
 
-            const response = await fetch(imgObj.current);
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = imgObj.current;
+          });
 
-            const blob = await response.blob();
+          // FIX: Draw to a temporary canvas to bake-in the correct EXIF rotation permanently
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = img.naturalWidth;
+          tempCanvas.height = img.naturalHeight;
+          const tempCtx = tempCanvas.getContext("2d");
+          tempCtx.drawImage(img, 0, 0);
 
-            const url = URL.createObjectURL(blob);
+          // Grab the clean, flattened image data directly
+          const cleanImageData = tempCanvas.toDataURL("image/jpeg", 0.85);
 
-            const link = document.createElement("a");
-
-            link.download = `PicStitch_${i + 1}.${fileExtension}`;
-
-            link.href = url;
-
-            link.click();
-
-            setTimeout(() => {
-              URL.revokeObjectURL(url);
-            }, 1000);
-
-            // SMALL DELAY FOR MOBILE BROWSERS
-            await new Promise((resolve) => setTimeout(resolve, 300));
-          }
-
-          showToast("Selected Images Saved!");
-        } catch (error) {
-          console.error("Export failed:", error);
-
-          showToast("Export failed", true);
-        } finally {
-          btn.innerText = originalText;
-
-          btn.style.opacity = "1";
-
-          btn.disabled = false;
-        }
-      }
-
-      async function exportPDF(e) {
-        if (canvas.width <= 1 || canvas.height <= 1) {
-          showToast("Nothing to export. Combine images first.", true);
-          return;
-        }
-        const btn = e.target;
-        const originalText = btn.innerText;
-        btn.innerText = "Processing...";
-        btn.style.opacity = "0.7";
-        btn.disabled = true;
-
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        try {
-          validateCanvasSize();
-          const { jsPDF } = window.jspdf;
           const pdfWidth = 800;
-          const scale = pdfWidth / canvas.width;
-          const pdfHeight = canvas.height * scale;
+          const scale = pdfWidth / tempCanvas.width;
+          const pdfHeight = tempCanvas.height * scale;
+
           const pdf = new jsPDF({
             orientation: pdfHeight > pdfWidth ? "portrait" : "landscape",
             unit: "px",
             format: [pdfWidth, pdfHeight],
           });
 
-          const blob = await exportCanvasBlob("image/jpeg", 0.75);
-          const url = URL.createObjectURL(blob);
-          const img = new Image();
-
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = url;
-          });
-          pdf.addImage(img, "JPEG", 0, 0, pdfWidth, pdfHeight);
-          URL.revokeObjectURL(url);
+          // Pass the flattened image to jsPDF
+          pdf.addImage(cleanImageData, "JPEG", 0, 0, pdfWidth, pdfHeight);
 
           const pdfBlob = pdf.output("blob");
           const pdfUrl = URL.createObjectURL(pdfBlob);
           const link = document.createElement("a");
-          link.download = `PicStitch_${Date.now()}.pdf`;
+          link.download = `PicStitch_Single_${Date.now()}.pdf`;
           link.href = pdfUrl;
 
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
+
           setTimeout(() => {
             URL.revokeObjectURL(pdfUrl);
           }, 1000);
+
           if (!isIOS) {
             showToast("PDF Saved Successfully!");
           }
         } catch (error) {
           console.error("Export failed:", error);
-          showToast("File too large for device memory", true);
+          showToast("Export failed", true);
         } finally {
           btn.innerText = originalText;
           btn.style.opacity = "1";
