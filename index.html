@@ -467,6 +467,18 @@
         width: 100%;
         transform: translateY(-50%);
       }
+
+      button:active {
+        transform: scale(0.96);
+      }
+
+      .preview-item,
+      button,
+      #canvas,
+      #magnifier {
+        will-change: transform;
+        transform: translateZ(0);
+      }
     </style>
   </head>
 
@@ -607,6 +619,9 @@
       const magnifierCanvas = document.getElementById("magnifierCanvas");
 
       const magnifierCtx = magnifierCanvas.getContext("2d");
+      const isIOS =
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
       const imageInput = document.getElementById("imageInput");
       const previewList = document.getElementById("previewList");
@@ -1848,8 +1863,11 @@
       function saveCanvasAsGroup() {
         if (isProcessing) return;
         isProcessing = true;
-        if (canvas.width === 0 || canvas.height === 0) {
+        if (canvas.width <= 1 || canvas.height <= 1) {
+          showToast("Nothing to Save", true);
+
           isProcessing = false;
+
           return;
         }
 
@@ -1949,7 +1967,7 @@
         });
       }
 
-      async function downloadImage(e) {
+      /* async function downloadImage(e) {
         if (canvas.width <= 1 || canvas.height <= 1) {
           showToast("Nothing to export. Combine images first.", true);
           return;
@@ -1986,6 +2004,113 @@
         } finally {
           btn.innerText = originalText;
           btn.style.opacity = "1";
+          btn.disabled = false;
+        }
+      } */
+
+      async function downloadImage(e) {
+        const btn = e.target;
+
+        const originalText = btn.innerText;
+
+        btn.innerText = "Processing...";
+
+        btn.style.opacity = "0.7";
+
+        btn.disabled = true;
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        try {
+          const qualityValue = Number(
+            document.getElementById("qualitySelect").value,
+          );
+
+          const exportFormat = qualityValue === 1 ? "image/png" : "image/jpeg";
+
+          const fileExtension = qualityValue === 1 ? "png" : "jpg";
+
+          // =========================================
+          // EXPORT COMBINED CANVAS
+          // =========================================
+          if (canvas.width > 1 && canvas.height > 1) {
+            validateCanvasSize();
+
+            const blob = await exportCanvasBlob(exportFormat, qualityValue);
+
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+
+            link.download = `PicStitch_${Date.now()}.${fileExtension}`;
+
+            link.href = url;
+
+            link.click();
+
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+            }, 1000);
+
+            if (!isIOS) {
+              showToast("Image Saved Successfully!");
+            }
+
+            return;
+          }
+
+          // =========================================
+          // EXPORT SELECTED IMAGES
+          // =========================================
+          const selectedImages = images.filter((img) => img.selected);
+
+          // IOS SAFARI MULTI-DOWNLOAD FIX
+          if (selectedImages.length > 1) {
+            showToast("Select one photo or Stich photos", true);
+
+            return;
+          }
+
+          if (selectedImages.length === 0) {
+            showToast("No selected image to export", true);
+            return;
+          }
+
+          for (let i = 0; i < selectedImages.length; i++) {
+            const imgObj = selectedImages[i];
+
+            const response = await fetch(imgObj.current);
+
+            const blob = await response.blob();
+
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+
+            link.download = `PicStitch_${i + 1}.${fileExtension}`;
+
+            link.href = url;
+
+            link.click();
+
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+            }, 1000);
+
+            // SMALL DELAY FOR MOBILE BROWSERS
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
+
+          showToast("Selected Images Saved!");
+        } catch (error) {
+          console.error("Export failed:", error);
+
+          showToast("Export failed", true);
+        } finally {
+          btn.innerText = originalText;
+
+          btn.style.opacity = "1";
+
           btn.disabled = false;
         }
       }
@@ -2038,7 +2163,9 @@
           setTimeout(() => {
             URL.revokeObjectURL(pdfUrl);
           }, 1000);
-          showToast("PDF Saved Successfully!");
+          if (!isIOS) {
+            showToast("PDF Saved Successfully!");
+          }
         } catch (error) {
           console.error("Export failed:", error);
           showToast("File too large for device memory", true);
