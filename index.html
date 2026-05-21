@@ -42,6 +42,11 @@
         -webkit-tap-highlight-color: transparent;
       }
 
+      html,
+      body {
+        overscroll-behavior-x: none;
+      }
+
       body {
         margin: 0;
         background: #0f1115;
@@ -284,7 +289,6 @@
         background: #0f1115;
         z-index: 99999;
         flex-direction: column;
-        touch-action: none;
         overscroll-behavior: none;
       }
 
@@ -355,8 +359,8 @@
       }
 
       .cropper-point {
-        width: 24px !important;
-        height: 24px !important;
+        width: 38px !important;
+        height: 38px !important;
         opacity: 1 !important;
         background-color: #4f46e5 !important;
       }
@@ -411,7 +415,6 @@
         visibility: hidden;
 
         background: rgba(30, 41, 59, 0.85);
-        backdrop-filter: blur(8px);
         border: 1px solid rgba(255, 255, 255, 0.1);
         color: white;
         padding: 12px 24px;
@@ -440,61 +443,22 @@
         visibility: visible;
       }
 
-      /* MAGNIFIER */
-
-      #magnifier {
-        position: fixed;
-        width: 140px;
-        height: 140px;
-        border-radius: 50%;
-        border: 4px solid #ffffff;
-        overflow: hidden;
-        z-index: 999999;
-        display: none;
-        pointer-events: none;
-        background: #000;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-      }
-
-      #magnifierCanvas {
-        width: 100%;
-        height: 100%;
-      }
-
-      #magnifierCrosshairX,
-      #magnifierCrosshairY {
-        position: absolute;
-        background: #00ffff;
-        pointer-events: none;
-      }
-
-      #magnifierCrosshairX {
-        left: 50%;
-        top: 0;
-        width: 2px;
-        height: 100%;
-        transform: translateX(-50%);
-      }
-
-      #magnifierCrosshairY {
-        top: 50%;
-        left: 0;
-        height: 2px;
-        width: 100%;
-        transform: translateY(-50%);
-      }
-
       button:active {
         transform: scale(0.96);
       }
 
-      .preview-item,
+      #freeCropCanvas,
+      #freeCropImage {
+        transition: transform 0.08s ease-out;
+      }
+
+      /*  .preview-item,
       button,
       #canvas,
       #magnifier {
         will-change: transform;
         transform: translateZ(0);
-      }
+      } */
     </style>
   </head>
 
@@ -599,13 +563,6 @@
 
     <div id="toastNotification" class="toast"></div>
 
-    <div id="magnifier">
-      <canvas id="magnifierCanvas" width="140" height="140"></canvas>
-
-      <div id="magnifierCrosshairX"></div>
-      <div id="magnifierCrosshairY"></div>
-    </div>
-
     <script>
       let cropper = null;
       let currentCropIndex = null;
@@ -628,13 +585,7 @@
 
       let lastTouchX = 0;
       let lastTouchY = 0;
-      let magnifierVisible = false;
 
-      const magnifier = document.getElementById("magnifier");
-
-      const magnifierCanvas = document.getElementById("magnifierCanvas");
-
-      const magnifierCtx = magnifierCanvas.getContext("2d");
       const isIOS =
         /iPad|iPhone|iPod/.test(navigator.userAgent) ||
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -644,7 +595,7 @@
       const canvas = document.getElementById("canvas");
       const ctx = canvas.getContext("2d", {
         alpha: false,
-        desynchronized: true,
+        desynchronized: false,
         willReadFrequently: false,
       });
 
@@ -889,6 +840,7 @@
           canvas.width = targetWidth * finalScale;
           canvas.height = totalHeight * finalScale;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.imageSmoothingEnabled = false;
 
           let y = 0;
           for (const scaled of scaledImages) {
@@ -969,6 +921,7 @@
           canvas.width = totalWidth * finalScale;
           canvas.height = targetHeight * finalScale;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.imageSmoothingEnabled = false;
 
           let x = 0;
           for (const scaled of scaledImages) {
@@ -1069,7 +1022,12 @@
             highlight: true,
             cropBoxMovable: false,
             cropBoxResizable: true,
-            dragMode: "none",
+            dragMode: "move",
+            toggleDragModeOnDblclick: false,
+
+            zoomOnTouch: false,
+
+            zoomOnWheel: false,
             modal: true,
             restore: false,
             checkOrientation: true,
@@ -1142,7 +1100,13 @@
                 highlight: true,
                 cropBoxMovable: false,
                 cropBoxResizable: true,
-                dragMode: "none",
+                dragMode: "move",
+
+                toggleDragModeOnDblclick: false,
+
+                zoomOnTouch: false,
+
+                zoomOnWheel: false,
               });
             };
             cropImage.src = url;
@@ -1209,6 +1173,8 @@
             setTimeout(initFreeCrop, 50);
           }
         } else {
+          activeCorner = null;
+
           btn.innerText = "Click to Perspective Crop";
           btn.style.background = "#0ea5e9";
 
@@ -1281,7 +1247,7 @@
         ctx.fill("evenodd");
 
         ctx.strokeStyle = "#0ea5e9";
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(freeCorners[0].x, freeCorners[0].y);
         ctx.lineTo(freeCorners[1].x, freeCorners[1].y);
@@ -1290,85 +1256,54 @@
         ctx.closePath();
         ctx.stroke();
 
-        ctx.fillStyle = "#ffffff";
-        freeCorners.forEach((c) => {
+        const handleRadius = 30;
+        const lineSize = 18;
+
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = "#3b82f6";
+
+        freeCorners.forEach((c, i) => {
+          // Transparent touch area
           ctx.beginPath();
-          ctx.arc(c.x, c.y, 18, 0, Math.PI * 2);
+
+          ctx.arc(c.x, c.y, handleRadius, 0, Math.PI * 2);
+
+          ctx.fillStyle = "rgba(120,140,255,0.22)";
+
           ctx.fill();
+
+          ctx.beginPath();
+
+          // TOP LEFT
+          if (i === 0) {
+            ctx.moveTo(c.x + lineSize, c.y);
+            ctx.lineTo(c.x, c.y);
+            ctx.lineTo(c.x, c.y + lineSize);
+          }
+
+          // TOP RIGHT
+          else if (i === 1) {
+            ctx.moveTo(c.x - lineSize, c.y);
+            ctx.lineTo(c.x, c.y);
+            ctx.lineTo(c.x, c.y + lineSize);
+          }
+
+          // BOTTOM RIGHT
+          else if (i === 2) {
+            ctx.moveTo(c.x - lineSize, c.y);
+            ctx.lineTo(c.x, c.y);
+            ctx.lineTo(c.x, c.y - lineSize);
+          }
+
+          // BOTTOM LEFT
+          else if (i === 3) {
+            ctx.moveTo(c.x + lineSize, c.y);
+            ctx.lineTo(c.x, c.y);
+            ctx.lineTo(c.x, c.y - lineSize);
+          }
+
           ctx.stroke();
         });
-      }
-
-      function updateMagnifier(pos) {
-        const img = document.getElementById("freeCropImage");
-
-        if (!img || !img.complete) return;
-
-        const rect = fCanvas.getBoundingClientRect();
-
-        const imgRatio = img.naturalWidth / img.naturalHeight;
-        const canvasRatio = fCanvas.width / fCanvas.height;
-
-        let drawW,
-          drawH,
-          offsetX = 0,
-          offsetY = 0;
-
-        if (imgRatio > canvasRatio) {
-          drawW = fCanvas.width;
-          drawH = drawW / imgRatio;
-          offsetY = (fCanvas.height - drawH) / 2;
-        } else {
-          drawH = fCanvas.height;
-          drawW = drawH * imgRatio;
-          offsetX = (fCanvas.width - drawW) / 2;
-        }
-
-        const scale = img.naturalWidth / drawW;
-
-        const imgX = (pos.x - offsetX) * scale;
-        const imgY = (pos.y - offsetY) * scale;
-
-        const zoom = 3;
-
-        const srcSize = 20;
-
-        magnifierCtx.clearRect(
-          0,
-          0,
-          magnifierCanvas.width,
-          magnifierCanvas.height,
-        );
-
-        magnifierCtx.imageSmoothingEnabled = false;
-
-        magnifierCtx.drawImage(
-          img,
-          imgX - srcSize / 2,
-          imgY - srcSize / 2,
-          srcSize,
-          srcSize,
-          0,
-          0,
-          magnifierCanvas.width,
-          magnifierCanvas.height,
-        );
-
-        magnifier.style.display = "block";
-
-        let left = rect.left + pos.x + 30;
-        let top = rect.top + pos.y - 160;
-
-        if (left + 140 > window.innerWidth) {
-          left = rect.left + pos.x - 170;
-        }
-
-        if (top < 20) {
-          top = rect.top + pos.y + 30;
-        }
-
-        magnifier.style.left = `${left}px`;
-        magnifier.style.top = `${top}px`;
       }
 
       function getMousePos(e) {
@@ -1390,7 +1325,7 @@
 
         const pos = getMousePos(e);
 
-        let minDist = 80;
+        let minDist = 65;
 
         activeCorner = null;
 
@@ -1411,10 +1346,6 @@
           lastTouchX = pos.x;
           lastTouchY = pos.y;
 
-          magnifierVisible = true;
-
-          updateMagnifier(activeCorner);
-
           e.preventDefault();
         }
       }
@@ -1431,7 +1362,7 @@
         const dy = pos.y - lastTouchY;
 
         // SHARPSCAN-LIKE CONTROL
-        const sensitivity = 0.37;
+        const sensitivity = 0.5;
 
         activeCorner.x += dx * sensitivity;
         activeCorner.y += dy * sensitivity;
@@ -1444,16 +1375,10 @@
         lastTouchY = pos.y;
 
         drawFreeCrop();
-
-        updateMagnifier(activeCorner);
       }
 
       function stopDrag() {
         activeCorner = null;
-
-        magnifierVisible = false;
-
-        magnifier.style.display = "none";
       }
 
       // PURE MATH REVERSE-HOMOGRAPHY FLATTENER
@@ -1486,19 +1411,48 @@
 
           const scale = img.naturalWidth / drawW;
 
-          const pts = freeCorners.map((c) => ({
-            x: (c.x - offsetX) * scale,
-            y: (c.y - offsetY) * scale,
-          }));
+          function sortCorners(pts) {
+            const center = {
+              x: pts.reduce((s, p) => s + p.x, 0) / 4,
+              y: pts.reduce((s, p) => s + p.y, 0) / 4,
+            };
 
+            pts.sort((a, b) => {
+              const angleA = Math.atan2(a.y - center.y, a.x - center.x);
+              const angleB = Math.atan2(b.y - center.y, b.x - center.x);
+              return angleA - angleB;
+            });
+
+            let topLeft = pts.reduce((prev, curr) =>
+              curr.x + curr.y < prev.x + prev.y ? curr : prev,
+            );
+
+            while (pts[0] !== topLeft) {
+              pts.push(pts.shift());
+            }
+
+            return pts;
+          }
+
+          const pts = sortCorners(
+            freeCorners.map((c) => ({
+              x: (c.x - offsetX) * scale,
+              y: (c.y - offsetY) * scale,
+            })),
+          );
           const w1 = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
           const w2 = Math.hypot(pts[2].x - pts[3].x, pts[2].y - pts[3].y);
 
           const h1 = Math.hypot(pts[3].x - pts[0].x, pts[3].y - pts[0].y);
           const h2 = Math.hypot(pts[2].x - pts[1].x, pts[2].y - pts[1].y);
 
-          const destW = Math.round(Math.max(w1, w2));
-          const destH = Math.round(Math.max(h1, h2));
+          const avgTopBottom = (w1 + w2) / 2;
+          const avgLeftRight = (h1 + h2) / 2;
+
+          const aspectRatio = avgTopBottom / avgLeftRight;
+
+          const destW = Math.round(avgTopBottom);
+          const destH = Math.round(destW / aspectRatio);
 
           const offscreen = document.createElement("canvas");
 
@@ -1586,61 +1540,28 @@
           const sh = srcCanvas.height;
 
           for (let y = 0; y < destH; y++) {
-            const v = y / (destH - 1);
+            const t = y / (destH - 1);
+
+            const leftX = pts[0].x + (pts[3].x - pts[0].x) * t;
+
+            const leftY = pts[0].y + (pts[3].y - pts[0].y) * t;
+
+            const rightX = pts[1].x + (pts[2].x - pts[1].x) * t;
+
+            const rightY = pts[1].y + (pts[2].y - pts[1].y) * t;
 
             for (let x = 0; x < destW; x++) {
-              const u = x / (destW - 1);
+              const s = x / (destW - 1);
 
-              const den = a13 * u + a23 * v + 1;
+              const srcX = leftX + (rightX - leftX) * s;
 
-              const srcX = (a11 * u + a21 * v + a31) / den;
-
-              const srcY = (a12 * u + a22 * v + a32) / den;
+              const srcY = leftY + (rightY - leftY) * s;
 
               if (srcX >= 0 && srcX < sw - 1 && srcY >= 0 && srcY < sh - 1) {
-                const x1 = Math.floor(srcX);
-                const y1 = Math.floor(srcY);
+                const ix = Math.floor(srcX);
+                const iy = Math.floor(srcY);
 
-                const x2 = x1 + 1;
-                const y2 = y1 + 1;
-
-                const dx = srcX - x1;
-                const dy = srcY - y1;
-
-                const c00 = srcBuf[y1 * sw + x1];
-                const c10 = srcBuf[y1 * sw + x2];
-                const c01 = srcBuf[y2 * sw + x1];
-                const c11 = srcBuf[y2 * sw + x2];
-
-                const r =
-                  (c00 & 255) * (1 - dx) * (1 - dy) +
-                  (c10 & 255) * dx * (1 - dy) +
-                  (c01 & 255) * (1 - dx) * dy +
-                  (c11 & 255) * dx * dy;
-
-                const g =
-                  ((c00 >> 8) & 255) * (1 - dx) * (1 - dy) +
-                  ((c10 >> 8) & 255) * dx * (1 - dy) +
-                  ((c01 >> 8) & 255) * (1 - dx) * dy +
-                  ((c11 >> 8) & 255) * dx * dy;
-
-                const b =
-                  ((c00 >> 16) & 255) * (1 - dx) * (1 - dy) +
-                  ((c10 >> 16) & 255) * dx * (1 - dy) +
-                  ((c01 >> 16) & 255) * (1 - dx) * dy +
-                  ((c11 >> 16) & 255) * dx * dy;
-
-                const a =
-                  ((c00 >> 24) & 255) * (1 - dx) * (1 - dy) +
-                  ((c10 >> 24) & 255) * dx * (1 - dy) +
-                  ((c01 >> 24) & 255) * (1 - dx) * dy +
-                  ((c11 >> 24) & 255) * dx * dy;
-
-                destBuf[y * destW + x] =
-                  ((a & 255) << 24) |
-                  ((b & 255) << 16) |
-                  ((g & 255) << 8) |
-                  (r & 255);
+                destBuf[y * destW + x] = srcBuf[iy * sw + ix];
               }
             }
           }
@@ -2052,9 +1973,15 @@
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         try {
+          document.body.style.transform = "translateZ(0)";
+
+          await new Promise((r) => requestAnimationFrame(r));
+
+          document.body.offsetHeight;
           const qualityValue = Number(
             document.getElementById("qualitySelect").value,
           );
+
           const exportFormat = qualityValue === 1 ? "image/png" : "image/jpeg";
           const fileExtension = qualityValue === 1 ? "png" : "jpg";
 
@@ -2064,7 +1991,11 @@
           if (canvas.width > 1 && canvas.height > 1) {
             validateCanvasSize();
 
-            const blob = await exportCanvasBlob(exportFormat, qualityValue);
+            const exportCanvas = canvas;
+
+            const blob = await new Promise((resolve) => {
+              exportCanvas.toBlob(resolve, exportFormat, qualityValue);
+            });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
 
@@ -2109,13 +2040,23 @@
             const tempCtx = tempCanvas.getContext("2d");
             tempCtx.drawImage(img, 0, 0);
 
-            const dataUrl = tempCanvas.toDataURL(exportFormat, qualityValue);
+            const blob = await new Promise((resolve) => {
+              tempCanvas.toBlob(resolve, exportFormat, qualityValue);
+            });
+
+            const url = URL.createObjectURL(blob);
 
             const link = document.createElement("a");
-            // Appends numbers (e.g., _1, _2) if saving multiple photos at once
+
             link.download = `PicStitch_Selected_${Date.now()}_${i + 1}.${fileExtension}`;
-            link.href = dataUrl;
+
+            link.href = url;
+
             link.click();
+
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+            }, 2000);
 
             // Tiny delay to ensure mobile browsers register separate downloads cleanly
             if (selectedImages.length > 1) {
@@ -2124,12 +2065,17 @@
           }
 
           if (!isIOS) {
-            showToast(selectedImages.length > 1 ? "Selected Images Saved!" : "Selected Image Saved!");
+            showToast(
+              selectedImages.length > 1
+                ? "Selected Images Saved!"
+                : "Selected Image Saved!",
+            );
           }
         } catch (error) {
           console.error("Export failed:", error);
           showToast("Export failed", true);
         } finally {
+          document.body.style.transform = "";
           btn.innerText = originalText;
           btn.style.opacity = "1";
           btn.disabled = false;
@@ -2146,6 +2092,11 @@
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         try {
+          document.body.style.transform = "translateZ(0)";
+
+          await new Promise((r) => requestAnimationFrame(r));
+
+          document.body.offsetHeight;
           const { jsPDF } = window.jspdf;
 
           // =========================================
@@ -2265,6 +2216,7 @@
           console.error("Export failed:", error);
           showToast("Export failed", true);
         } finally {
+          document.body.style.transform = "";
           btn.innerText = originalText;
           btn.style.opacity = "1";
           btn.disabled = false;
