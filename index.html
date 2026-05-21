@@ -2042,6 +2042,100 @@
         }
       } */
 
+      async function downloadImage(e) {
+        const btn = e.target;
+        const originalText = btn.innerText;
+        btn.innerText = "Processing...";
+        btn.style.opacity = "0.7";
+        btn.disabled = true;
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        try {
+          const qualityValue = Number(
+            document.getElementById("qualitySelect").value,
+          );
+          const exportFormat = qualityValue === 1 ? "image/png" : "image/jpeg";
+          const fileExtension = qualityValue === 1 ? "png" : "jpg";
+
+          // =========================================
+          // 1. EXPORT COMBINED STITCHED CANVAS
+          // =========================================
+          if (canvas.width > 1 && canvas.height > 1) {
+            validateCanvasSize();
+
+            const blob = await exportCanvasBlob(exportFormat, qualityValue);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            link.download = `PicStitch_${Date.now()}.${fileExtension}`;
+            link.href = url;
+            link.click();
+
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+            }, 1000);
+
+            if (!isIOS) {
+              showToast("Image Saved Successfully!");
+            }
+            return;
+          }
+
+          // =========================================
+          // 2. EXPORT SELECTED IMAGES (Single or Multiple)
+          // =========================================
+          const selectedImages = images.filter((img) => img.selected);
+
+          if (selectedImages.length === 0) {
+            showToast("No selected image to export", true);
+            return;
+          }
+
+          // Loop through all selected images and download them sequentially
+          for (let i = 0; i < selectedImages.length; i++) {
+            const imgObj = selectedImages[i];
+            const img = new Image();
+
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = reject;
+              img.src = imgObj.current;
+            });
+
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = img.naturalWidth;
+            tempCanvas.height = img.naturalHeight;
+            const tempCtx = tempCanvas.getContext("2d");
+            tempCtx.drawImage(img, 0, 0);
+
+            const dataUrl = tempCanvas.toDataURL(exportFormat, qualityValue);
+
+            const link = document.createElement("a");
+            // Appends numbers (e.g., _1, _2) if saving multiple photos at once
+            link.download = `PicStitch_Selected_${Date.now()}_${i + 1}.${fileExtension}`;
+            link.href = dataUrl;
+            link.click();
+
+            // Tiny delay to ensure mobile browsers register separate downloads cleanly
+            if (selectedImages.length > 1) {
+              await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+          }
+
+          if (!isIOS) {
+            showToast(selectedImages.length > 1 ? "Selected Images Saved!" : "Selected Image Saved!");
+          }
+        } catch (error) {
+          console.error("Export failed:", error);
+          showToast("Export failed", true);
+        } finally {
+          btn.innerText = originalText;
+          btn.style.opacity = "1";
+          btn.disabled = false;
+        }
+      }
+
       async function exportPDF(e) {
         const btn = e.target;
         const originalText = btn.innerText;
