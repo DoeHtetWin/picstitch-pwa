@@ -86,3 +86,7 @@ Crop UI changes
 
 update 20
 Optimize text and UI changes
+
+update 22
+Remove magnifier
+fix blank android preview 
