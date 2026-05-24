@@ -29,9 +29,17 @@
           forceApply: true,
         });
 
-        window.addEventListener("contextmenu", (event) => {
+        /*  window.addEventListener("contextmenu", (event) => {
           event.preventDefault();
-        });
+        }); */
+
+        // Add this inside your window.addEventListener("DOMContentLoaded") instead:
+        document
+          .getElementById("canvasWrapper")
+          .addEventListener("contextmenu", (e) => e.preventDefault());
+        document
+          .getElementById("cropModal")
+          .addEventListener("contextmenu", (e) => e.preventDefault());
       });
     </script>
     <script src="cropper.min.js"></script>
@@ -172,7 +180,7 @@
         border: 1px solid rgba(255, 255, 255, 0.15);
         padding: 12px 40px 12px 16px;
         border-radius: 8px;
-        font-size: 15px;
+        font-size: 16px;
         font-weight: 600;
         cursor: pointer;
         outline: none;
@@ -239,6 +247,30 @@
         backdrop-filter: blur(4px);
       }
 
+      #canvasCloseBtn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.95);
+        color: white;
+        border: none;
+        z-index: 100;
+        font-size: 16px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        backdrop-filter: blur(4px);
+      }
+
+      #canvasCloseBtn:hover {
+        transform: scale(1.08);
+      }
+
       .preview-badge {
         position: absolute;
         top: 8px;
@@ -276,7 +308,7 @@
         height: auto;
         object-fit: contain;
         border-radius: 12px;
-        display: none;
+        /* display: none; */
         background: transparent;
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
         cursor: pointer;
@@ -471,7 +503,12 @@
           <div class="icon">📁</div>
           <div class="text">Click to Select Images</div>
           <!-- <input type="file" id="imageInput" multiple accept="image/*" /> -->
-          <input type="file" id="imageInput" multiple accept="image/jpeg, image/png, image/webp, image/heic" />
+          <input
+            type="file"
+            id="imageInput"
+            multiple
+            accept="image/jpeg, image/png, image/webp, image/heic"
+          />
         </label>
       </div>
 
@@ -486,9 +523,10 @@
       <div class="slider-group custom-select-wrapper">
         <label for="qualitySelect">Export Quality:</label>
         <select id="qualitySelect" class="modern-select">
-          <option value="0.6">Good (Small JPG)</option>
-          <option value="0.8">Better (High JPG)</option>
-          <option value="1" selected>Best (Lossless PNG)</option>
+          <option value="0.45">Low Quality JPG</option>
+          <option value="0.65" selected>Medium Quality JPG</option>
+          <option value="0.8">High Quality JPG</option>
+          <option value="png">Lossless Huge PNG</option>
         </select>
       </div>
 
@@ -504,7 +542,12 @@
       </div>
 
       <div class="preview-list" id="previewList"></div>
-      <canvas id="canvas"></canvas>
+      <!-- <canvas id="canvas"></canvas> -->
+      <div id="canvasWrapper" style="position: relative; display: none">
+        <button id="canvasCloseBtn" onclick="clearStitchCanvas()">✕</button>
+
+        <canvas id="canvas"></canvas>
+      </div>
     </div>
 
     <div id="cropModal">
@@ -601,8 +644,35 @@
       });
 
       // HIGH-END GOD MODE FOR WINDOWS
-      function getDeviceLimits() {
+      /*  function getDeviceLimits() {
         return { area: 100000000, dimension: 40000 };
+      } */
+
+      // HIGH-END GOD MODE FOR WINDOWS
+      /*  function getDeviceLimits() {
+        // Lowering area to 40 Megapixels and dimension to 16,000px
+        // This forces the script to slightly downscale 6+ huge photos 
+        // so they don't blow up the browser's graphics memory all at once.
+        return { area: 40000000, dimension: 16000 };
+      } */
+
+      function getDeviceLimits() {
+        const isIOSDevice =
+          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        const isAndroid = /Android/.test(navigator.userAgent);
+
+        if (isIOSDevice) {
+          // Bumping up for modern iPhones: 8192px dimension allows for excellent high-res stitching
+          // while staying safely under Safari's absolute crash limit.
+          return { area: 35000000, dimension: 8192 };
+        } else if (isAndroid) {
+          // Matching modern Android capabilities to iOS
+          return { area: 35000000, dimension: 8192 };
+        } else {
+          // Windows/Mac Desktop God Mode
+          return { area: 40000000, dimension: 16000 };
+        }
       }
 
       canvas.addEventListener("click", () => {
@@ -784,13 +854,18 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         canvas.width = 1;
         canvas.height = 1;
-        canvas.style.display = "none";
+        document.getElementById("canvasWrapper").style.display = "none";
+      }
+
+      function clearStitchCanvas() {
+        combineMode = null;
+
+        clearCanvas();
+
+        showToast("Stitch Cleared!");
       }
 
       function combineVertical(showMessage = true) {
-        if (isCombining) return;
-        isCombining = true;
-
         const activeImages = images.filter((item) => item.selected);
         if (activeImages.length === 0) {
           showToast("Please select images first", true);
@@ -800,7 +875,7 @@
         }
 
         combineMode = "vertical";
-        canvas.style.display = "block";
+        document.getElementById("canvasWrapper").style.display = "block";
         if (showMessage) showToast("Loading Vertical Stitch...");
 
         setTimeout(() => {
@@ -864,14 +939,10 @@
             else ctx.drawImage(scaled.item.img, 0, y, drawWidth, drawHeight);
             y += drawHeight;
           }
-          isCombining = false;
         }, 50);
       }
 
       function combineHorizontal(showMessage = true) {
-        if (isCombining) return;
-        isCombining = true;
-
         const activeImages = images.filter((item) => item.selected);
         if (activeImages.length === 0) {
           showToast("Please select images first", true);
@@ -881,7 +952,8 @@
         }
 
         combineMode = "horizontal";
-        canvas.style.display = "block";
+
+        document.getElementById("canvasWrapper").style.display = "block";
         if (showMessage) showToast("Loading Horizontal Stitch...");
 
         setTimeout(() => {
@@ -945,7 +1017,6 @@
             else ctx.drawImage(scaled.item.img, x, 0, drawWidth, drawHeight);
             x += drawWidth;
           }
-          isCombining = false;
         }, 50);
       }
 
@@ -1979,12 +2050,15 @@
           await new Promise((r) => requestAnimationFrame(r));
 
           document.body.offsetHeight;
-          const qualityValue = Number(
-            document.getElementById("qualitySelect").value,
-          );
+          const qualitySelect = document.getElementById("qualitySelect").value;
 
-          const exportFormat = qualityValue === 1 ? "image/png" : "image/jpeg";
-          const fileExtension = qualityValue === 1 ? "png" : "jpg";
+          const isPNG = qualitySelect === "png";
+
+          const exportFormat = isPNG ? "image/png" : "image/jpeg";
+
+          const quality = isPNG ? 1 : Number(qualitySelect);
+
+          const fileExtension = isPNG ? "png" : "jpg";
 
           // =========================================
           // 1. EXPORT COMBINED STITCHED CANVAS
@@ -1992,24 +2066,82 @@
           if (canvas.width > 1 && canvas.height > 1) {
             validateCanvasSize();
 
-            const exportCanvas = canvas;
+            const exportCanvas = document.createElement("canvas");
+
+            let maxExportWidth;
+
+            if (qualitySelect === "0.45") {
+              maxExportWidth = 1400;
+            } else if (qualitySelect === "0.65") {
+              maxExportWidth = 2200;
+            } else if (qualitySelect === "0.8") {
+              maxExportWidth = 3200;
+            } else {
+              // PNG keeps original resolution
+              maxExportWidth = canvas.width;
+            }
+
+            const scale = Math.min(1, maxExportWidth / canvas.width);
+
+            exportCanvas.width = canvas.width * scale;
+            exportCanvas.height = canvas.height * scale;
+
+            const exportCtx = exportCanvas.getContext("2d");
+
+            exportCtx.imageSmoothingEnabled = true;
+            exportCtx.imageSmoothingQuality = "high";
+
+            exportCtx.drawImage(
+              canvas,
+              0,
+              0,
+              exportCanvas.width,
+              exportCanvas.height,
+            );
 
             const blob = await new Promise((resolve) => {
-              exportCanvas.toBlob(resolve, exportFormat, qualityValue);
+              exportCanvas.toBlob(resolve, exportFormat, quality);
             });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
+            const file = new File(
+              [blob],
+              `PicStitch_${Date.now()}.${fileExtension}`,
+              { type: exportFormat },
+            );
 
-            link.download = `PicStitch_${Date.now()}.${fileExtension}`;
-            link.href = url;
-            link.click();
+            // Check if the device supports native mobile sharing
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              try {
+                await navigator.share({
+                  files: [file],
+                  title: "PicStitch Export",
+                });
+                showToast("Shared Successfully!");
+              } catch (err) {
+                console.log("User cancelled share or share failed.");
+              }
+            } else {
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
 
-            setTimeout(() => {
-              URL.revokeObjectURL(url);
-            }, 1000);
+              link.download = `PicStitch_${Date.now()}.${fileExtension}`;
+              link.href = url;
+              link.click();
 
+              /*  link.href = url;
             if (!isIOS) {
-              showToast("Image Saved Successfully!");
+              link.download = `PicStitch_${Date.now()}.${fileExtension}`;
+            }
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link); */
+
+              setTimeout(() => {
+                URL.revokeObjectURL(url);
+              }, 1000);
+
+              if (!isIOS) {
+                showToast("Image Saved Successfully!");
+              }
             }
             return;
           }
@@ -2042,7 +2174,7 @@
             tempCtx.drawImage(img, 0, 0);
 
             const blob = await new Promise((resolve) => {
-              tempCanvas.toBlob(resolve, exportFormat, qualityValue);
+              tempCanvas.toBlob(resolve, exportFormat, quality);
             });
 
             const url = URL.createObjectURL(blob);
@@ -2050,10 +2182,16 @@
             const link = document.createElement("a");
 
             link.download = `PicStitch_Selected_${Date.now()}_${i + 1}.${fileExtension}`;
-
             link.href = url;
-
             link.click();
+
+            /* link.href = url;
+            if (!isIOS) {
+              link.download = `PicStitch_${Date.now()}.${fileExtension}`;
+            }
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link); */
 
             setTimeout(() => {
               URL.revokeObjectURL(url);
@@ -2090,6 +2228,7 @@
         btn.style.opacity = "0.7";
         btn.disabled = true;
 
+        await new Promise((resolve) => requestAnimationFrame(resolve));
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         try {
