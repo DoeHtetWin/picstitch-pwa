@@ -8,7 +8,6 @@
     />
     <title>PicStitch - Windows Pro</title>
     <link rel="manifest" href="manifest.json" />
-
     <meta name="theme-color" content="#0f1115" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta
@@ -16,32 +15,9 @@
       content="black-translucent"
     />
     <link rel="apple-touch-icon" href="image/logo-192.png" />
-
     <link rel="stylesheet" href="cropper.min.css" />
     <link rel="stylesheet" href="mobile-drag-drop.css" />
     <script src="mobile-drag-drop.js"></script>
-    <script>
-      window.addEventListener("DOMContentLoaded", () => {
-        MobileDragDrop.polyfill({
-          dragImageTranslateOverride:
-            MobileDragDrop.scrollBehaviourDragImageTranslateOverride,
-          holdToDrag: 300,
-          forceApply: true,
-        });
-
-        /*  window.addEventListener("contextmenu", (event) => {
-          event.preventDefault();
-        }); */
-
-        // Add this inside your window.addEventListener("DOMContentLoaded") instead:
-        document
-          .getElementById("canvasWrapper")
-          .addEventListener("contextmenu", (e) => e.preventDefault());
-        document
-          .getElementById("cropModal")
-          .addEventListener("contextmenu", (e) => e.preventDefault());
-      });
-    </script>
     <script src="cropper.min.js"></script>
     <script src="jspdf.umd.min.js"></script>
     <style>
@@ -49,12 +25,11 @@
         box-sizing: border-box;
         -webkit-tap-highlight-color: transparent;
       }
-
       html,
       body {
         overscroll-behavior-x: none;
+        overscroll-behavior-y: none;
       }
-
       body {
         margin: 0;
         background: #0f1115;
@@ -70,33 +45,28 @@
         user-select: none;
         -webkit-touch-callout: none;
       }
-
       input,
       select {
         -webkit-user-select: auto;
         user-select: auto;
       }
-
       header {
         padding: 20px 16px;
         background: transparent;
         text-align: center;
-        font-size: 28px;
+        font-size: 22px;
         font-weight: 800;
         letter-spacing: -0.5px;
         color: #ffffff;
       }
-
       .container {
         max-width: 800px;
         margin: 0 auto;
         padding: 16px;
       }
-
       .upload-section {
         margin-bottom: 20px;
       }
-
       .file-dropzone {
         display: flex;
         flex-direction: column;
@@ -109,34 +79,28 @@
         cursor: pointer;
         transition: all 0.2s ease;
       }
-
       .file-dropzone:hover {
         background: rgba(255, 255, 255, 0.06);
         border-color: #4f46e5;
       }
-
       .file-dropzone .icon {
         font-size: 32px;
         margin-bottom: 12px;
       }
-
       .file-dropzone .text {
         color: #94a3b8;
         font-size: 16px;
         font-weight: 500;
       }
-
       .file-dropzone input[type="file"] {
         display: none;
       }
-
       .controls {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
         gap: 12px;
         margin-bottom: 24px;
       }
-
       button {
         background: #1e293b;
         color: #f8fafc;
@@ -149,14 +113,28 @@
         transition: all 0.2s ease;
         touch-action: manipulation;
       }
-
-      button:hover {
-        background: #4f46e5;
-        color: #ffffff;
-        border-color: #4f46e5;
-        transform: translateY(-2px);
+      @media (hover: hover) {
+        button:hover {
+          background: #4f46e5;
+          color: #ffffff;
+          border-color: #4f46e5;
+          transform: translateY(-2px);
+        }
       }
-
+      button:active {
+        transform: scale(0.96);
+      }
+      button:disabled {
+        transform: none !important;
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+      .flash-btn {
+        background: #4f46e5 !important;
+        border-color: #4f46e5 !important;
+        color: white !important;
+        transform: scale(0.97);
+      }
       .custom-select-wrapper {
         background: #1e293b;
         padding: 16px 20px;
@@ -167,13 +145,11 @@
         margin-bottom: 24px;
         border: 1px solid rgba(255, 255, 255, 0.05);
       }
-
       .custom-select-wrapper label {
         font-weight: 500;
         color: #e2e8f0;
         font-size: 15px;
       }
-
       .modern-select {
         background: #0f1115;
         color: #ffffff;
@@ -194,23 +170,20 @@
         background-size: 12px auto;
         transition: all 0.2s ease;
       }
-
       .modern-select:focus {
         border-color: #4f46e5;
         box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
       }
-
       .preview-list {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
         gap: 12px;
         margin-bottom: 20px;
       }
-
       .preview-item {
         position: relative;
         width: 100%;
-        aspect-ratio: 9 / 16;
+        aspect-ratio: 9/16;
         height: auto;
         background: #1b1b1b;
         border-radius: 12px;
@@ -218,7 +191,6 @@
         border: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
       }
-
       .preview-item img {
         width: 100%;
         height: 100%;
@@ -227,7 +199,6 @@
         display: block;
         pointer-events: none;
       }
-
       .preview-delete {
         position: absolute;
         top: 8px;
@@ -246,31 +217,10 @@
         cursor: pointer;
         backdrop-filter: blur(4px);
       }
-
-      #canvasCloseBtn {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        background: rgba(239, 68, 68, 0.95);
-        color: white;
-        border: none;
-        z-index: 100;
-        font-size: 16px;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        backdrop-filter: blur(4px);
+      .preview-delete:hover {
+        background: rgb(239, 68, 68);
+        transform: scale(1.1);
       }
-
-      #canvasCloseBtn:hover {
-        transform: scale(1.08);
-      }
-
       .preview-badge {
         position: absolute;
         top: 8px;
@@ -291,29 +241,42 @@
         backdrop-filter: blur(4px);
         transition: all 0.2s ease;
       }
-
       .preview-badge.selected {
         background: #4f46e5;
         border-color: #4f46e5;
         color: #ffffff;
       }
-
-      .preview-delete:hover {
-        background: rgb(239, 68, 68);
-        transform: scale(1.1);
+      #canvasCloseBtn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.95);
+        color: white;
+        border: none;
+        z-index: 100;
+        font-size: 16px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        backdrop-filter: blur(4px);
       }
-
+      #canvasCloseBtn:hover {
+        transform: scale(1.08);
+      }
       #canvas {
         width: 100%;
         height: auto;
         object-fit: contain;
         border-radius: 12px;
-        /* display: none; */
         background: transparent;
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
         cursor: pointer;
       }
-
       #cropModal {
         display: none;
         position: fixed;
@@ -322,8 +285,16 @@
         z-index: 99999;
         flex-direction: column;
         overscroll-behavior: none;
+        animation: fadeIn 0.15s ease-out forwards;
       }
-
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
       .crop-header {
         height: 70px;
         display: flex;
@@ -333,12 +304,10 @@
         background: #1e293b;
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
-
       .crop-title {
         font-size: 18px;
         font-weight: 600;
       }
-
       .crop-body {
         flex: 1;
         position: relative;
@@ -350,7 +319,6 @@
         min-height: 0;
         min-width: 0;
       }
-
       #cropImage {
         display: block;
         width: 100%;
@@ -359,105 +327,75 @@
         max-width: none;
         max-height: none;
       }
-
-      /* FIX 1: The New Button Layout Container */
       .crop-controls {
         height: auto;
         padding: 16px;
         display: flex;
-        flex-direction: column; /* Stacks the Free Form button on top */
+        flex-direction: column;
         justify-content: center;
         align-items: center;
         background: #1e293b;
         border-top: 1px solid rgba(255, 255, 255, 0.05);
       }
-
       .crop-controls-row {
         display: flex;
         width: 100%;
         gap: 12px;
       }
-
       .crop-controls button {
-        font-size: 14px;
-        padding: 14px 8px;
+        font-size: 13.5px;
+        padding: 10px 8px;
         flex: 1;
         min-width: 0;
         background: #334155;
+        border-radius: 8px;
       }
-
       .crop-controls button:hover {
         background: #4f46e5;
       }
-
       .cropper-point {
         width: 38px !important;
         height: 38px !important;
         opacity: 1 !important;
         background-color: #4f46e5 !important;
       }
-
       .cropper-line {
         background-color: #4f46e5 !important;
       }
-
       .cropper-point.point-se {
         width: 32px !important;
         height: 32px !important;
       }
-
       .cropper-view-box {
         outline: 2px solid #4f46e5 !important;
       }
-
       .cropper-face {
         background: rgba(79, 70, 229, 0.15) !important;
       }
-
       .cropper-container {
         width: 100% !important;
         height: 100% !important;
       }
-
       .cropper-container img {
         max-width: none !important;
       }
-
-      #cropModal {
-        animation: fadeIn 0.15s ease-out forwards;
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
-      }
-
       .toast {
         position: fixed;
-        /* Lock the final position in place */
         top: calc(env(safe-area-inset-top, 20px) + 20px);
         left: 50%;
-        /* Start hidden slightly higher up */
         transform: translate(-50%, -20px);
         opacity: 0;
         visibility: hidden;
-
-        background: rgba(30, 41, 59, 0.85);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: #1e293b;
+        border: 1px solid #334155;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
         color: white;
         padding: 12px 24px;
         border-radius: 30px;
         font-size: 15px;
         font-weight: 600;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
         z-index: 9999999;
-        pointer-events: none; /* Prevents it from blocking your taps */
-
-        /* Smooth fade and slide for both appearing and disappearing */
+        pointer-events: none;
         transition:
           transform 0.4s ease-out,
           opacity 0.4s ease-out,
@@ -467,59 +405,47 @@
         gap: 8px;
         white-space: nowrap;
       }
-
       .toast.show {
-        /* Drop into exact center and become fully visible */
         transform: translate(-50%, 0);
         opacity: 1;
         visibility: visible;
       }
-
-      button:active {
-        transform: scale(0.96);
-      }
-
       #freeCropCanvas,
       #freeCropImage {
         transition: transform 0.08s ease-out;
       }
-
-      /*  .preview-item,
-      button,
-      #canvas,
-      #magnifier {
-        will-change: transform;
-        transform: translateZ(0);
-      } */
     </style>
   </head>
-
   <body>
     <header>PicStitch PWA</header>
-
     <div class="container">
       <div class="upload-section">
         <label for="imageInput" class="file-dropzone">
           <div class="icon">📁</div>
           <div class="text">Click to Select Images</div>
-          <!-- <input type="file" id="imageInput" multiple accept="image/*" /> -->
           <input
             type="file"
             id="imageInput"
             multiple
-            accept="image/jpeg, image/png, image/webp, image/heic"
+            accept="image/jpeg, image/png, image/webp"
           />
         </label>
       </div>
-
       <div class="controls">
-        <button onclick="combineVertical()">Vertical Stitch</button>
-        <button onclick="combineHorizontal()">Horizontal Stitch</button>
-        <button onclick="saveCanvasAsGroup()">Save Group</button>
-        <button onclick="downloadImage(event)">Export Image</button>
-        <button onclick="exportPDF(event)">Export PDF</button>
+        <button id="verticalBtn" onclick="combineVertical()">
+          Vertical Stitch
+        </button>
+        <button id="horizontalBtn" onclick="combineHorizontal()">
+          Horizontal Stitch
+        </button>
+        <button id="saveGroupBtn" onclick="saveCanvasAsGroup()">
+          Save Group
+        </button>
+        <button id="exportImageBtn" onclick="downloadImage(event)">
+          Export Image
+        </button>
+        <button id="exportPdfBtn" onclick="exportPDF(event)">Export PDF</button>
       </div>
-
       <div class="slider-group custom-select-wrapper">
         <label for="qualitySelect">Export Quality:</label>
         <select id="qualitySelect" class="modern-select">
@@ -529,7 +455,6 @@
           <option value="png">Lossless Huge PNG</option>
         </select>
       </div>
-
       <div
         style="
           margin-bottom: 12px;
@@ -540,12 +465,9 @@
       >
         Click Photos Below to Crop
       </div>
-
       <div class="preview-list" id="previewList"></div>
-      <!-- <canvas id="canvas"></canvas> -->
       <div id="canvasWrapper" style="position: relative; display: none">
         <button id="canvasCloseBtn" onclick="clearStitchCanvas()">✕</button>
-
         <canvas id="canvas"></canvas>
       </div>
     </div>
@@ -556,10 +478,8 @@
         <div class="crop-title" id="cropModeTitle">Standard Crop Mode</div>
         <button id="applyBtn" onclick="applyCrop()">Apply</button>
       </div>
-
       <div class="crop-body">
         <img id="cropImage" />
-
         <div
           id="freeCropContainer"
           style="display: none; position: relative; width: 100%; height: 100%"
@@ -589,9 +509,8 @@
           ></canvas>
         </div>
       </div>
-
       <div class="crop-controls">
-        <div class="crop-controls-row">
+        <div class="crop-controls-row" style="margin-bottom: 12px">
           <button
             id="toggleCropBtn"
             onclick="toggleCropMode()"
@@ -599,41 +518,144 @@
           >
             Perspective Crop
           </button>
-
           <button onclick="resetCrop()">Reset</button>
         </div>
+        <div class="crop-controls-row" id="transformRow">
+          <button
+            id="rotateBtn"
+            onclick="rotateCrop()"
+            style="background: #8b5cf6; font-size: 20px; font-weight: bold"
+            title="Rotate 90°"
+          >
+            ↻
+          </button>
+          <button
+            id="flipHBtn"
+            onclick="flipCrop('horizontal')"
+            style="background: #ec4899; font-size: 20px; font-weight: bold"
+            title="Flip Horizontal"
+          >
+            ⇄
+          </button>
+          <button
+            id="flipVBtn"
+            onclick="flipCrop('vertical')"
+            style="background: #f43f5e; font-size: 20px; font-weight: bold"
+            title="Flip Vertical"
+          >
+            ⇅
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="pdfModal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 17, 21, 0.9);
+        z-index: 999999;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      "
+    >
+      <div
+        style="
+          background: #1e293b;
+          padding: 24px;
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          width: 100%;
+          max-width: 320px;
+          text-align: center;
+        "
+      >
+        <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 18px">
+          PDF Export Options
+        </h3>
+        <button
+          id="btnCombinePdf"
+          style="width: 100%; margin-bottom: 12px; background: #0ea5e9"
+        >
+          Combine selected to Single PDF
+        </button>
+        <button
+          id="btnSeparatePdf"
+          style="width: 100%; margin-bottom: 12px; background: #4f46e5"
+        >
+          Export selected to Separate PDFs
+        </button>
+        <button id="btnCancelPdf" style="width: 100%; background: #ef4444">
+          Cancel
+        </button>
       </div>
     </div>
 
     <div id="toastNotification" class="toast"></div>
 
     <script>
+      // ==========================================
+      // #region 1. CONFIGURATION CONSTANTS
+      // ==========================================
+      const APP_VERSION = "1.0.0"
+      
+      const isIOS =
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      //#endregion
+
+      // ==========================================
+      // #region 2. GLOBAL STATE
+      // ==========================================
       let cropper = null;
-      let currentCropIndex = null;
-      let cropMode = "image";
+      let images = [];
       let cropHistory = {};
       let redoHistory = {};
-      let images = [];
       let combineMode = null;
+      let currentCropIndex = null;
+      let cropMode = "image";
       let isRestoringHistory = false;
       let draggedIndex = null;
       let isProcessing = false;
       let isCombining = false;
+      let combinedCanvasCacheUrl = null;
+      let stitchCanvasVisible = false;
 
-      // Free Form Crop Variables
       let isFreeForm = false;
       let freeCorners = [];
       let activeCorner = null;
       let dragOffsetX = 0;
       let dragOffsetY = 0;
-
       let lastTouchX = 0;
       let lastTouchY = 0;
 
-      const isIOS =
-        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      let toastTimeout;
+      let rerenderQueued = false;
+      let stitchDirty = true;
+      const previewMap = new Map();
+      //#endregion
 
+      // ==========================================
+      // #region 3. DEVICE DETECTION
+      // ==========================================
+      function getDeviceLimits() {
+        const isIOSDevice =
+          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        const isAndroid = /Android/.test(navigator.userAgent);
+        if (isIOSDevice) return { area: 35000000, dimension: 8192 };
+        if (isAndroid) return { area: 35000000, dimension: 8192 };
+        return { area: 40000000, dimension: 16000 };
+      }
+      //#endregion
+
+      // ==========================================
+      // #region 4. DOM REFERENCES
+      // ==========================================
       const imageInput = document.getElementById("imageInput");
       const previewList = document.getElementById("previewList");
       const canvas = document.getElementById("canvas");
@@ -642,215 +664,390 @@
         desynchronized: false,
         willReadFrequently: false,
       });
+      const fCanvas = document.getElementById("freeCropCanvas");
+      //#endregion
 
-      // HIGH-END GOD MODE FOR WINDOWS
-      /*  function getDeviceLimits() {
-        return { area: 100000000, dimension: 40000 };
-      } */
+      // ==========================================
+      // #region 5. LOW LEVEL UTILITIES
+      // ==========================================
+      function flashButton(btn, duration = 2000) {
+        if (!btn) return;
+        btn.classList.add("flash-btn");
+        setTimeout(() => btn.classList.remove("flash-btn"), duration);
+      }
+      function lockUI(lock = true) {
+        document.body.style.pointerEvents = lock ? "none" : "";
+      }
+      function yieldToBrowser() {
+        return new Promise((resolve) =>
+          requestAnimationFrame(() => setTimeout(resolve, 0)),
+        );
+      }
+      function validateCanvasSize() {
+        const limits = getDeviceLimits();
+        if (canvas.width * canvas.height > limits.area)
+          throw new Error("Canvas too large for this device");
+      }
+      //#endregion
 
-      // HIGH-END GOD MODE FOR WINDOWS
-      /*  function getDeviceLimits() {
-        // Lowering area to 40 Megapixels and dimension to 16,000px
-        // This forces the script to slightly downscale 6+ huge photos 
-        // so they don't blow up the browser's graphics memory all at once.
-        return { area: 40000000, dimension: 16000 };
-      } */
-
-      function getDeviceLimits() {
-        const isIOSDevice =
-          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-        const isAndroid = /Android/.test(navigator.userAgent);
-
-        if (isIOSDevice) {
-          // Bumping up for modern iPhones: 8192px dimension allows for excellent high-res stitching
-          // while staying safely under Safari's absolute crash limit.
-          return { area: 35000000, dimension: 8192 };
-        } else if (isAndroid) {
-          // Matching modern Android capabilities to iOS
-          return { area: 35000000, dimension: 8192 };
-        } else {
-          // Windows/Mac Desktop God Mode
-          return { area: 40000000, dimension: 16000 };
+      // ==========================================
+      // #region 6. MEMORY MANAGEMENT
+      // ==========================================
+      function revokeBlobUrl(url) {
+        if (url && typeof url === "string" && url.startsWith("blob:")) {
+          try {
+            URL.revokeObjectURL(url);
+          } catch (e) {
+            console.warn("Failed to revoke URL:", url);
+          }
         }
       }
+      function cleanupCanvas(canvasEl) {
+        if (!canvasEl) return;
+        const c = canvasEl.getContext("2d");
+        if (c) c.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        canvasEl.width = 1;
+        canvasEl.height = 1;
+      }
+      function cleanupImageObject(imgObj) {
+        if (!imgObj) return;
+        revokeBlobUrl(imgObj.current);
+        if (imgObj.original !== imgObj.current) revokeBlobUrl(imgObj.original);
+        if (imgObj.img instanceof HTMLCanvasElement) cleanupCanvas(imgObj.img);
+        imgObj.img = null;
+      }
+      async function exportCanvasBlob(type, quality = 0.9) {
+        if ("OffscreenCanvas" in window) {
+          const offscreen = new OffscreenCanvas(canvas.width, canvas.height);
+          offscreen.getContext("2d").drawImage(canvas, 0, 0);
+          return await offscreen.convertToBlob({ type, quality });
+        }
+        return await new Promise((resolve) =>
+          canvas.toBlob(resolve, type, quality),
+        );
+      }
+      async function canvasToBitmap(canvasEl) {
+        return await createImageBitmap(canvasEl);
+      }
+      async function getRawBitmap(imgObj) {
+        if (imgObj.rawBitmap) return imgObj.rawBitmap;
+        const bitmap = await createImageBitmap(imgObj.rawMeta.file);
+        imgObj.rawBitmap = bitmap;
+        return bitmap;
+      }
+      function releaseRawBitmaps() {
+        for (const img of images) {
+          if (img.rawBitmap) {
+            try {
+              img.rawBitmap.close();
+            } catch (e) {}
+            img.rawBitmap = null;
+          }
+        }
+      }
+      //#endregion
 
-      canvas.addEventListener("click", () => {
-        if (canvas.width <= 1 || canvas.height <= 1) return;
-        cropCombined();
+      // ==========================================
+      // #region 7. TOAST SYSTEM
+      // ==========================================
+      function showToast(message, isError = false, persist = false) {
+        const toast = document.getElementById("toastNotification");
+        clearTimeout(toastTimeout);
+        toast.classList.remove("show");
+        toast.style.color = "#ffffff";
+        toast.innerHTML = isError ? `❌ ${message}` : `✅ ${message}`;
+        toast.style.background = "";
+        void toast.offsetWidth;
+        toast.classList.add("show");
+        if (!persist)
+          toastTimeout = setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+      //#endregion
+
+      // ==========================================
+      // #region 8. EVENT LISTENERS
+      // ==========================================
+      window.addEventListener("DOMContentLoaded", () => {
+        MobileDragDrop.polyfill({
+          forceApply: true,
+          holdToDrag: 250,
+          dragImageTranslateOverride:
+            MobileDragDrop.scrollBehaviourDragImageTranslateOverride,
+        });
+        document
+          .getElementById("canvasWrapper")
+          .addEventListener("contextmenu", (e) => e.preventDefault());
+        document
+          .getElementById("cropModal")
+          .addEventListener("contextmenu", (e) => e.preventDefault());
+
+        // FIX: Escape key closes PDF modal
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            const pdfModal = document.getElementById("pdfModal");
+            if (pdfModal.style.display === "flex")
+              document.getElementById("btnCancelPdf").click();
+          }
+        });
       });
 
-      imageInput.addEventListener("change", async (e) => {
-        const files = [...e.target.files];
-        if (files.length === 0) return;
+      imageInput.addEventListener("change", handleImageInput);
+      canvas.addEventListener("click", () => {
+        if (canvas.width > 1 && canvas.height > 1) cropCombined();
+      });
+      fCanvas.addEventListener("mousedown", startDrag);
+      fCanvas.addEventListener("mousemove", drag);
+      fCanvas.addEventListener("touchstart", startDrag, { passive: false });
+      fCanvas.addEventListener("touchmove", drag, { passive: false });
+      window.addEventListener("mouseup", stopDrag);
+      window.addEventListener("touchend", stopDrag);
+      //#endregion
 
-        showToast("Loading images...");
-        const loadedImages = [];
+      // ==========================================
+      // #region 9. IMAGE INPUT SYSTEM
+      // ==========================================
+      async function handleImageInput(e) {
+        let files = [...e.target.files];
+        if (files.length === 0) return;
+        showToast("Loading images...", false, true);
+        await new Promise((r) => requestAnimationFrame(r));
+
+        const currentCount = images.length;
+        const remainingSlots = 15 - currentCount;
+        let message = "Images Loaded!";
+        let isError = false;
+
+        if (currentCount >= 15) {
+          showToast("Maximum of 15 images reached", true);
+          return;
+        }
+        if (files.length > remainingSlots) {
+          files = files.slice(0, remainingSlots);
+          message = `Loaded only first ${remainingSlots} images to stay under 15`;
+          isError = true;
+        }
 
         for (const file of files) {
           try {
             const objectUrl = URL.createObjectURL(file);
-            const img = new Image();
-
+            const rawImg = new Image();
             await new Promise((resolve, reject) => {
-              img.onload = resolve;
-              img.onerror = reject;
-              img.src = objectUrl;
+              rawImg.onload = resolve;
+              rawImg.onerror = reject;
+              rawImg.src = objectUrl;
             });
 
-            loadedImages.push({
-              id:
-                window.crypto && window.crypto.randomUUID
-                  ? window.crypto.randomUUID()
-                  : Date.now().toString(36),
+            const maxUiDim = 2500;
+            let uiW = rawImg.naturalWidth,
+              uiH = rawImg.naturalHeight;
+            if (uiW > maxUiDim || uiH > maxUiDim) {
+              const scale = Math.min(maxUiDim / uiW, maxUiDim / uiH);
+              uiW *= scale;
+              uiH *= scale;
+            }
 
-              original: objectUrl,
+            const resizeCanvas = document.createElement("canvas");
+            resizeCanvas.width = uiW;
+            resizeCanvas.height = uiH;
+            const resizeCtx = resizeCanvas.getContext("2d", { alpha: false });
+            resizeCtx.imageSmoothingEnabled = true;
+            resizeCtx.imageSmoothingQuality = "high";
+            resizeCtx.drawImage(rawImg, 0, 0, uiW, uiH);
 
-              current: objectUrl,
+            const uiBlob = await new Promise((res) =>
+              resizeCanvas.toBlob(res, "image/webp", 0.92),
+            );
+            const uiUrl = URL.createObjectURL(uiBlob);
+            const uiImg = new Image();
+            await new Promise((resolve, reject) => {
+              uiImg.onload = resolve;
+              uiImg.onerror = reject;
+              uiImg.src = uiUrl;
+            });
 
-              img,
+            const rawRatio = rawImg.naturalWidth / uiImg.naturalWidth;
+            // Keep original File for the raw pipeline
+            const rawMeta = {
+              file,
+              width: rawImg.naturalWidth,
+              height: rawImg.naturalHeight,
+            };
 
-              cropData: null,
-
+            images.push({
+              id: window.crypto?.randomUUID?.() ?? Date.now().toString(36),
+              original: uiUrl,
+              current: uiUrl,
+              img: uiImg,
+              rawMeta,
+              rawBitmap: null,
+              rawRatio,
+              pristineUrl: uiUrl,
+              pristineImg: uiImg,
               freeFormData: null,
-
               selected: true,
             });
 
-            await new Promise((resolve) => requestAnimationFrame(resolve));
+            rawImg.src = "";
+            revokeBlobUrl(objectUrl);
+            renderPreview();
+            cleanupCanvas(resizeCanvas);
+            await new Promise((r) => requestAnimationFrame(r));
+            await new Promise((r) => setTimeout(r, 0));
           } catch (error) {
             console.error("Image load failed:", error);
+            showToast("Some images failed to load", true);
           }
         }
 
-        images.push(...loadedImages);
-        renderPreview();
         rerenderCanvas();
         e.target.value = "";
-        showToast("Images Loaded!");
-      });
-
-      clearCanvas();
-
-      function renderPreview() {
-        previewList.innerHTML = "";
-        let currentNumber = 1;
-
-        images.forEach((item, index) => {
-          const div = document.createElement("div");
-          div.className = "preview-item";
-          div.draggable = true;
-
-          let badgeClass = "preview-badge";
-          let badgeText = "";
-          if (item.selected) {
-            badgeClass += " selected";
-            badgeText = currentNumber++;
-          }
-
-          div.innerHTML = `
-            <img src="${item.current}">
-            <div class="${badgeClass}">${badgeText}</div>
-            <button class="preview-delete">✕</button>
-          `;
-
-          const deleteBtn = div.querySelector(".preview-delete");
-          const badge = div.querySelector(".preview-badge");
-
-          badge.addEventListener("click", (e) => {
-            e.stopPropagation();
-            item.selected = !item.selected;
-            renderPreview();
-            rerenderCanvas();
-          });
-
-          deleteBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            removeImage(index);
-          });
-
-          div.addEventListener("click", () => {
-            openCrop(index);
-          });
-
-          div.addEventListener("dragstart", () => {
-            draggedIndex = index;
-          });
-          div.addEventListener("dragover", (e) => e.preventDefault());
-          div.addEventListener("dragenter", (e) => e.preventDefault());
-
-          div.addEventListener("drop", (e) => {
-            e.preventDefault();
-            const from = draggedIndex;
-            const to = index;
-            if (from === to) return;
-            const moved = images.splice(from, 1)[0];
-            images.splice(to, 0, moved);
-            rerenderCanvas();
-            renderPreview();
-          });
-
-          previewList.appendChild(div);
-        });
+        showToast(message, isError);
       }
+      //#endregion
 
+      // ==========================================
+      // #region 10. IMAGE COLLECTION MANAGEMENT
+      // ==========================================
       function removeImage(index) {
+        stitchDirty = true;
         const image = images[index];
-        if (image.original && image.original.startsWith("blob:"))
-          URL.revokeObjectURL(image.original);
+        cleanupImageObject(image);
         delete cropHistory[image.id];
         delete redoHistory[image.id];
-
         images.splice(index, 1);
+        showToast("Image Removed!");
 
-        if (currentCropIndex === index) {
-          closeCrop();
-          currentCropIndex = null;
+        // FIX: Keep currentCropIndex valid after removal
+        if (currentCropIndex !== null) {
+          if (currentCropIndex === index) {
+            closeCrop();
+            currentCropIndex = null;
+          } else if (currentCropIndex > index) {
+            currentCropIndex--;
+          }
         }
 
         if (images.length === 0) {
           imageInput.value = "";
           combineMode = null;
           clearCanvas();
-        } else {
-          rerenderCanvas();
-        }
+        } else rerenderCanvas();
         renderPreview();
       }
+      //#endregion
 
-      /*  function rerenderCanvas() {
-        const activeImages = images.filter((item) => item.selected);
-        if (activeImages.length === 0) {
-          clearCanvas();
-          return;
-        }
-        if (combineMode === "vertical") combineVertical(false);
-        else if (combineMode === "horizontal") combineHorizontal(false);
-        else if (activeImages.length === 1) {
-          combineVertical(false);
-          combineMode = null;
-        }
-      } */
+      // ==========================================
+      // #region 11. PREVIEW RENDER SYSTEM
+      // ==========================================
+      function renderPreview() {
+        let currentNumber = 1;
+        const activeIds = new Set();
 
-      function rerenderCanvas() {
-        const activeImages = images.filter((item) => item.selected);
+        images.forEach((item, index) => {
+          activeIds.add(item.id);
+          let div = previewMap.get(item.id);
 
-        if (activeImages.length === 0) {
-          clearCanvas();
-          return;
-        }
+          if (!div) {
+            div = document.createElement("div");
+            div.className = "preview-item";
+            div.draggable = true;
+            div.setAttribute("drag-drop", "true");
+            div.innerHTML = `<img><div class="preview-badge"></div><button class="preview-delete">✕</button>`;
+            previewMap.set(item.id, div);
 
-        // ONLY RENDER WHEN USER EXPLICITLY CHOOSES
-        if (combineMode === "vertical") {
-          combineVertical(false);
-        } else if (combineMode === "horizontal") {
-          combineHorizontal(false);
-        } else {
-          clearCanvas();
+            div
+              .querySelector(".preview-delete")
+              .addEventListener("click", (e) => {
+                e.stopPropagation();
+                stitchDirty = true;
+                removeImage(images.findIndex((x) => x.id === item.id));
+              });
+            div.addEventListener("click", () =>
+              openCrop(images.findIndex((x) => x.id === item.id)),
+            );
+            div.addEventListener("dragstart", (e) => {
+              draggedIndex = [...previewList.children].indexOf(div);
+              if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", draggedIndex);
+              }
+            });
+            div.addEventListener("dragenter", (e) => e.preventDefault());
+            div.addEventListener("dragover", (e) => e.preventDefault());
+            div.addEventListener("drop", (e) => {
+              e.preventDefault();
+              const to = [...previewList.children].indexOf(div);
+              if (draggedIndex === to) return;
+              const moved = images.splice(draggedIndex, 1)[0];
+              images.splice(to, 0, moved);
+              draggedIndex = null;
+              stitchDirty = true;
+              renderPreview();
+              rerenderCanvas();
+            });
+            // FIX: Only append on creation, not every render pass
+            previewList.appendChild(div);
+          }
+
+          const img = div.querySelector("img");
+          if (img.src !== item.current) img.src = item.current;
+
+          const badge = div.querySelector(".preview-badge");
+          badge.className = item.selected
+            ? "preview-badge selected"
+            : "preview-badge";
+          badge.textContent = item.selected ? currentNumber++ : "";
+          badge.onclick = (e) => {
+            e.stopPropagation();
+            item.selected = !item.selected;
+            stitchDirty = true;
+            renderPreview();
+            rerenderCanvas();
+          };
+        });
+
+        // Enforce correct DOM order matching images array
+        images.forEach((item) => {
+          const div = previewMap.get(item.id);
+          if (div) previewList.appendChild(div);
+        });
+
+        for (const [id, node] of previewMap.entries()) {
+          if (!activeIds.has(id)) {
+            node.remove();
+            previewMap.delete(id);
+          }
         }
+      }
+
+      function rerenderCanvas(force = false) {
+        if (!force && !stitchDirty) return;
+        if (rerenderQueued) return;
+        rerenderQueued = true;
+        requestAnimationFrame(() => {
+          rerenderQueued = false;
+          const activeImages = images.filter((item) => item.selected);
+          if (activeImages.length === 0 || !stitchCanvasVisible) {
+            clearCanvas();
+            return;
+          }
+          stitchDirty = false;
+          if (combineMode === "vertical") {
+            combineVertical(false, false);
+            return;
+          }
+          if (combineMode === "horizontal") {
+            combineHorizontal(false, false);
+            return;
+          }
+        });
       }
 
       function clearCanvas() {
+        if (combinedCanvasCacheUrl) {
+          URL.revokeObjectURL(combinedCanvasCacheUrl);
+          combinedCanvasCacheUrl = null;
+        }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         canvas.width = 1;
         canvas.height = 1;
@@ -858,14 +1055,26 @@
       }
 
       function clearStitchCanvas() {
-        combineMode = null;
-
+        stitchCanvasVisible = false;
+        releaseRawBitmaps();
         clearCanvas();
-
         showToast("Stitch Cleared!");
       }
+      //#endregion
 
-      function combineVertical(showMessage = true) {
+      // ==========================================
+      // #region 12. STITCH ENGINE
+      // ==========================================
+      function combineVertical(showMessage = true, flash = true) {
+        // FIX: Guard concurrent stitch calls
+        if (isCombining) return;
+        isCombining = true;
+
+        if (combinedCanvasCacheUrl) {
+          URL.revokeObjectURL(combinedCanvasCacheUrl);
+          combinedCanvasCacheUrl = null;
+        }
+
         const activeImages = images.filter((item) => item.selected);
         if (activeImages.length === 0) {
           showToast("Please select images first", true);
@@ -875,74 +1084,89 @@
         }
 
         combineMode = "vertical";
+        if (flash) flashButton(document.getElementById("verticalBtn"));
+        stitchCanvasVisible = true;
         document.getElementById("canvasWrapper").style.display = "block";
         if (showMessage) showToast("Loading Vertical Stitch...");
 
-        setTimeout(() => {
-          const widths = activeImages.map((item) =>
-            item.cropData ? item.cropData.width : item.img.width,
-          );
-          const targetWidth = Math.max(...widths);
-          let totalHeight = 0;
-          const scaledImages = [];
+        requestAnimationFrame(async () => {
+          try {
+            const widths = activeImages.map((item) =>
+              item.rawMeta
+                ? item.rawMeta.width
+                : item.img.naturalWidth || item.img.width,
+            );
+            const targetWidth = Math.max(...widths);
+            let totalHeight = 0;
+            const scaledImages = [];
 
-          for (const item of activeImages) {
-            let sourceWidth = item.img.width,
-              sourceHeight = item.img.height;
-            if (item.cropData) {
-              sourceWidth = item.cropData.width;
-              sourceHeight = item.cropData.height;
+            for (const item of activeImages) {
+              const rImg = await getRawBitmap(item);
+
+              const sw = rImg.width;
+              const sh = rImg.height;
+              const scale = targetWidth / sw;
+              const scaledHeight = sh * scale;
+              scaledImages.push({
+                rImg,
+                width: targetWidth,
+                height: scaledHeight,
+              });
+              totalHeight += scaledHeight;
             }
-            const scale = targetWidth / sourceWidth;
-            const scaledHeight = sourceHeight * scale;
 
-            scaledImages.push({
-              item,
-              width: targetWidth,
-              height: scaledHeight,
-            });
-            totalHeight += scaledHeight;
+            const limits = getDeviceLimits();
+            let fs = 1;
+            if (targetWidth * totalHeight > limits.area)
+              fs = Math.sqrt(limits.area / (targetWidth * totalHeight));
+            if (totalHeight * fs > limits.dimension)
+              fs = limits.dimension / totalHeight;
+            if (targetWidth * fs > limits.dimension)
+              fs = limits.dimension / targetWidth;
+
+            if (
+              !Number.isFinite(targetWidth) ||
+              !Number.isFinite(totalHeight) ||
+              targetWidth <= 0 ||
+              totalHeight <= 0
+            ) {
+              throw new Error("Invalid canvas size");
+            }
+
+            canvas.width = Math.round(targetWidth * fs);
+            canvas.height = Math.round(totalHeight * fs);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // FIX: Enable smoothing for proper downscale quality
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+
+            let y = 0;
+            for (const scaled of scaledImages) {
+              await yieldToBrowser();
+              const dw = Math.round(scaled.width * fs);
+              const dh = Math.round(scaled.height * fs);
+              ctx.drawImage(scaled.rImg, 0, y, dw, dh);
+              y += dh;
+            }
+          } catch (e) {
+            console.error(e);
+            showToast("Vertical stitch failed", true);
+          } finally {
+            isCombining = false;
           }
-
-          const limits = getDeviceLimits();
-          let finalScale = 1;
-          if (targetWidth * totalHeight > limits.area)
-            finalScale = Math.sqrt(limits.area / (targetWidth * totalHeight));
-          if (totalHeight * finalScale > limits.dimension)
-            finalScale = limits.dimension / totalHeight;
-          if (targetWidth * finalScale > limits.dimension)
-            finalScale = limits.dimension / targetWidth;
-
-          canvas.width = targetWidth * finalScale;
-          canvas.height = totalHeight * finalScale;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.imageSmoothingEnabled = false;
-
-          let y = 0;
-          for (const scaled of scaledImages) {
-            const crop = scaled.item.cropData;
-            const drawWidth = scaled.width * finalScale;
-            const drawHeight = scaled.height * finalScale;
-
-            if (crop)
-              ctx.drawImage(
-                scaled.item.img,
-                crop.x,
-                crop.y,
-                crop.width,
-                crop.height,
-                0,
-                y,
-                drawWidth,
-                drawHeight,
-              );
-            else ctx.drawImage(scaled.item.img, 0, y, drawWidth, drawHeight);
-            y += drawHeight;
-          }
-        }, 50);
+        });
       }
 
-      function combineHorizontal(showMessage = true) {
+      function combineHorizontal(showMessage = true, flash = true) {
+        // FIX: Guard concurrent stitch calls
+        if (isCombining) return;
+        isCombining = true;
+
+        if (combinedCanvasCacheUrl) {
+          URL.revokeObjectURL(combinedCanvasCacheUrl);
+          combinedCanvasCacheUrl = null;
+        }
+
         const activeImages = images.filter((item) => item.selected);
         if (activeImages.length === 0) {
           showToast("Please select images first", true);
@@ -952,135 +1176,117 @@
         }
 
         combineMode = "horizontal";
-
+        if (flash) flashButton(document.getElementById("horizontalBtn"));
+        stitchCanvasVisible = true;
         document.getElementById("canvasWrapper").style.display = "block";
         if (showMessage) showToast("Loading Horizontal Stitch...");
 
-        setTimeout(() => {
-          const heights = activeImages.map((item) =>
-            item.cropData ? item.cropData.height : item.img.height,
-          );
-          const targetHeight = Math.max(...heights);
-          let totalWidth = 0;
-          const scaledImages = [];
+        requestAnimationFrame(async () => {
+          try {
+            const heights = activeImages.map((item) =>
+              item.rawMeta
+                ? item.rawMeta.height
+                : item.img.naturalHeight || item.img.height,
+            );
+            const targetHeight = Math.max(...heights);
+            let totalWidth = 0;
+            const scaledImages = [];
 
-          for (const item of activeImages) {
-            let sourceWidth = item.img.width,
-              sourceHeight = item.img.height;
-            if (item.cropData) {
-              sourceWidth = item.cropData.width;
-              sourceHeight = item.cropData.height;
+            for (const item of activeImages) {
+              const rImg = await getRawBitmap(item);
+
+              const sw = rImg.width;
+              const sh = rImg.height;
+              const scale = targetHeight / sh;
+              const scaledWidth = sw * scale;
+              scaledImages.push({
+                rImg,
+                width: scaledWidth,
+                height: targetHeight,
+              });
+              totalWidth += scaledWidth;
             }
-            const scale = targetHeight / sourceHeight;
-            const scaledWidth = sourceWidth * scale;
 
-            scaledImages.push({
-              item,
-              width: scaledWidth,
-              height: targetHeight,
-            });
-            totalWidth += scaledWidth;
+            const limits = getDeviceLimits();
+            let fs = 1;
+            if (totalWidth * targetHeight > limits.area)
+              fs = Math.sqrt(limits.area / (totalWidth * targetHeight));
+            if (totalWidth * fs > limits.dimension)
+              fs = limits.dimension / totalWidth;
+            if (targetHeight * fs > limits.dimension)
+              fs = limits.dimension / targetHeight;
+
+            if (
+              !Number.isFinite(totalWidth) ||
+              !Number.isFinite(targetHeight) ||
+              totalWidth <= 0 ||
+              targetHeight <= 0
+            ) {
+              throw new Error("Invalid canvas size");
+            }
+
+            canvas.width = Math.round(totalWidth * fs);
+            canvas.height = Math.round(targetHeight * fs);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // FIX: Enable smoothing for proper downscale quality
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+
+            let x = 0;
+            for (const scaled of scaledImages) {
+              await yieldToBrowser();
+              const dw = Math.round(scaled.width * fs);
+              const dh = Math.round(scaled.height * fs);
+              ctx.drawImage(scaled.rImg, x, 0, dw, dh);
+              x += dw;
+            }
+          } catch (e) {
+            console.error(e);
+            showToast("Horizontal stitch failed", true);
+          } finally {
+            isCombining = false;
           }
-
-          const limits = getDeviceLimits();
-          let finalScale = 1;
-          if (totalWidth * targetHeight > limits.area)
-            finalScale = Math.sqrt(limits.area / (totalWidth * targetHeight));
-          if (totalWidth * finalScale > limits.dimension)
-            finalScale = limits.dimension / totalWidth;
-          if (targetHeight * finalScale > limits.dimension)
-            finalScale = limits.dimension / targetHeight;
-
-          canvas.width = totalWidth * finalScale;
-          canvas.height = targetHeight * finalScale;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.imageSmoothingEnabled = false;
-
-          let x = 0;
-          for (const scaled of scaledImages) {
-            const crop = scaled.item.cropData;
-            const drawWidth = scaled.width * finalScale;
-            const drawHeight = scaled.height * finalScale;
-
-            if (crop)
-              ctx.drawImage(
-                scaled.item.img,
-                crop.x,
-                crop.y,
-                crop.width,
-                crop.height,
-                x,
-                0,
-                drawWidth,
-                drawHeight,
-              );
-            else ctx.drawImage(scaled.item.img, x, 0, drawWidth, drawHeight);
-            x += drawWidth;
-          }
-        }, 50);
+        });
       }
+      //#endregion
 
-      function saveCropState() {
-        if (!cropper || isRestoringHistory) return;
-        const state = cropper.getData();
-        const key =
-          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
-
-        if (!cropHistory[key]) cropHistory[key] = [];
-        if (!redoHistory[key]) redoHistory[key] = [];
-
-        const history = cropHistory[key];
-        const last = history[history.length - 1];
-
-        if (last && JSON.stringify(last) === JSON.stringify(state)) return;
-        history.push(JSON.parse(JSON.stringify(state)));
-        if (history.length > 50) history.shift();
-        redoHistory[key] = [];
-      }
-
-      function openCrop(index) {
+      // ==========================================
+      // #region 13. STANDARD CROP SYSTEM
+      // ==========================================
+      function openCrop(index, isRotation = false) {
         cropMode = "image";
-
         currentCropIndex = index;
-
         isFreeForm = false;
 
         const modal = document.getElementById("cropModal");
-
         const cropImage = document.getElementById("cropImage");
-
         const freeContainer = document.getElementById("freeCropContainer");
+        const imageObj = images[index];
+        const transformRow = document.getElementById("transformRow");
 
-        const controlsRow = document.querySelector(".crop-controls-row");
-
-        document.getElementById("toggleCropBtn").innerText =
-          "Click to Perspective Crop";
-
+        if (transformRow)
+          transformRow.style.display = imageObj.isGroup ? "none" : "flex";
+        document.getElementById("toggleCropBtn").style.display =
+          imageObj.isGroup ? "none" : "block";
+        document.getElementById("toggleCropBtn").innerText = "Perspective Crop";
         document.getElementById("toggleCropBtn").style.background = "#0ea5e9";
-
         freeContainer.style.display = "none";
-
         cropImage.style.display = "block";
 
         if (cropper) {
           cropper.destroy();
           cropper = null;
         }
-
         cropImage.removeAttribute("src");
-
         modal.style.display = "flex";
-        const imageObj = images[index];
 
         cropImage.onload = () => {
           cropper = new Cropper(cropImage, {
             minContainerWidth: 300,
             minContainerHeight: 300,
-
             cropend() {
               saveCropState();
             },
-
             viewMode: 0,
             autoCropArea: 1,
             responsive: true,
@@ -1096,32 +1302,22 @@
             cropBoxResizable: true,
             dragMode: "move",
             toggleDragModeOnDblclick: false,
-
             zoomOnTouch: false,
-
             zoomOnWheel: false,
             modal: true,
             restore: false,
             checkOrientation: true,
-
             ready() {
               const savedCrop = images[index].cropData;
-
-              if (savedCrop) {
-                cropper.setData(savedCrop);
-              }
-
+              if (savedCrop) cropper.setData(savedCrop);
               const key = images[currentCropIndex].id;
-
               cropHistory[key] = [
                 JSON.parse(JSON.stringify(cropper.getData())),
               ];
-
               redoHistory[key] = [];
             },
           });
         };
-
         cropImage.src = images[index].original;
       }
 
@@ -1130,7 +1326,16 @@
         cropMode = "combined";
         currentCropIndex = null;
 
+        const transformRow = document.getElementById("transformRow");
+        if (transformRow) transformRow.style.display = "none";
+        document.getElementById("toggleCropBtn").style.display = "none";
         resetToStandardUI();
+
+        // FIX: Use cached URL only if still valid; otherwise generate fresh
+        if (combinedCanvasCacheUrl) {
+          openCombinedCropFromUrl(combinedCanvasCacheUrl);
+          return;
+        }
 
         const modal = document.getElementById("cropModal");
         const cropImage = document.getElementById("cropImage");
@@ -1145,141 +1350,529 @@
           (blob) => {
             if (!blob) return;
             const url = URL.createObjectURL(blob);
-            cropImage.onload = () => {
-              cropper = new Cropper(cropImage, {
-                minContainerWidth: 300,
-                minContainerHeight: 300,
-                cropend() {
-                  saveCropState();
-                },
-                ready() {
-                  cropHistory["combined"] = [
-                    JSON.parse(JSON.stringify(cropper.getData())),
-                  ];
-                  redoHistory["combined"] = [];
-                  URL.revokeObjectURL(url);
-                },
-                viewMode: 0,
-                autoCropArea: 1,
-                responsive: true,
-                background: false,
-                movable: false,
-                zoomable: true,
-                scalable: true,
-                rotatable: true,
-                guides: true,
-                center: true,
-                highlight: true,
-                cropBoxMovable: false,
-                cropBoxResizable: true,
-                dragMode: "move",
-
-                toggleDragModeOnDblclick: false,
-
-                zoomOnTouch: false,
-
-                zoomOnWheel: false,
-              });
-            };
-            cropImage.src = url;
+            combinedCanvasCacheUrl = url;
+            openCombinedCropFromUrl(url);
           },
           "image/webp",
           0.9,
         );
       }
 
-      // TOGGLE CROP MODES
-      function resetToStandardUI() {
-        isFreeForm = false;
-        document.getElementById("cropModeTitle").innerText =
-          "Standard Crop Mode";
-        document.getElementById("toggleCropBtn").innerText =
-          "Click to Perspective Crop";
-        document.getElementById("toggleCropBtn").style.background = "#0ea5e9";
+      function openCombinedCropFromUrl(url) {
+        const modal = document.getElementById("cropModal");
+        const cropImage = document.getElementById("cropImage");
+        if (cropper) {
+          cropper.destroy();
+          cropper = null;
+        }
+        cropImage.removeAttribute("src");
+        modal.style.display = "flex";
+        cropImage.onload = () => {
+          cropper = new Cropper(cropImage, {
+            minContainerWidth: 300,
+            minContainerHeight: 300,
+            cropend() {
+              saveCropState();
+            },
+            ready() {
+              cropHistory["combined"] = [
+                JSON.parse(JSON.stringify(cropper.getData())),
+              ];
+              redoHistory["combined"] = [];
+            },
+            viewMode: 0,
+            autoCropArea: 1,
+            responsive: true,
+            background: false,
+            movable: false,
+            zoomable: true,
+            scalable: true,
+            rotatable: true,
+            guides: true,
+            center: true,
+            highlight: true,
+            cropBoxMovable: false,
+            cropBoxResizable: true,
+            dragMode: "move",
+            toggleDragModeOnDblclick: false,
+            zoomOnTouch: false,
+            zoomOnWheel: false,
+          });
+        };
+        cropImage.src = url;
+      }
 
-        document.getElementById("freeCropContainer").style.display = "none";
-        document.getElementById("cropImage").style.display = "block";
+      async function applyCrop() {
+        if (isFreeForm) {
+          applyFreeFormCrop();
+          return;
+        }
+        if (!cropper) return;
+        if (cropMode === "combined") {
+          applyCombinedCrop();
+          return;
+        }
 
-        document.querySelector(".crop-controls-row").style.display = "flex";
+        const imgObj = images[currentCropIndex];
+        const croppedCanvas = cropper.getCroppedCanvas();
+
+        const uiBlob = await new Promise((res) =>
+          croppedCanvas.toBlob(res, "image/webp", 0.9),
+        );
+        const uiUrl = URL.createObjectURL(uiBlob);
+        const uiImg = new Image();
+        await new Promise((res) => {
+          uiImg.onload = res;
+          uiImg.src = uiUrl;
+        });
+
+        const rawCanvas = document.createElement("canvas");
+        rawCanvas.width = croppedCanvas.width;
+        rawCanvas.height = croppedCanvas.height;
+        rawCanvas.getContext("2d").drawImage(croppedCanvas, 0, 0);
+
+        if (
+          imgObj.current?.startsWith("blob:") &&
+          imgObj.current !== imgObj.pristineUrl
+        )
+          revokeBlobUrl(imgObj.current);
+        if (
+          imgObj.original?.startsWith("blob:") &&
+          imgObj.original !== imgObj.current &&
+          imgObj.original !== imgObj.pristineUrl
+        )
+          revokeBlobUrl(imgObj.original);
+
+        imgObj.original = uiUrl;
+        imgObj.current = uiUrl;
+        imgObj.img = uiImg;
+
+        // FIX: Update rawBitmap and rawMeta so stitching stays accurate after crop
+
+        if (imgObj.rawBitmap) {
+          try {
+            imgObj.rawBitmap.close();
+          } catch (e) {}
+        }
+
+        imgObj.rawBitmap = null;
+
+        cleanupCanvas(rawCanvas);
+        imgObj.freeFormData = null;
+        cropHistory[imgObj.id] = [];
+        redoHistory[imgObj.id] = [];
+
+        stitchDirty = true;
+        renderPreview();
+        rerenderCanvas();
+        cleanupCanvas(croppedCanvas);
+        openCrop(currentCropIndex, true);
+        showToast("Action Applied!");
+      }
+
+      function applyCombinedCrop() {
+        const croppedCanvas = cropper.getCroppedCanvas();
+        canvas.width = croppedCanvas.width;
+        canvas.height = croppedCanvas.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(croppedCanvas, 0, 0);
+        cleanupCanvas(croppedCanvas);
+
+        // FIX: Null out stale cache so next canvas click generates a fresh snapshot
+        if (combinedCanvasCacheUrl) {
+          URL.revokeObjectURL(combinedCanvasCacheUrl);
+          combinedCanvasCacheUrl = null;
+        }
+        closeCrop();
+      }
+
+      async function resetCrop() {
+        if (cropMode === "combined") {
+          if (cropper) {
+            cropper.reset();
+            requestAnimationFrame(() => {
+              cropper.clear();
+              cropper.crop();
+            });
+          }
+          return;
+        }
+        if (cropMode !== "image" || currentCropIndex === null) return;
+        const imgObj = images[currentCropIndex];
+        cropHistory[imgObj.id] = [];
+        redoHistory[imgObj.id] = [];
+        if (isFreeForm) toggleCropMode();
+        openCrop(currentCropIndex, true);
+        renderPreview();
+        rerenderCanvas();
+        showToast("Crop Reset!");
       }
 
       function toggleCropMode() {
         isFreeForm = !isFreeForm;
-
         const btn = document.getElementById("toggleCropBtn");
-
         const normalImg = document.getElementById("cropImage");
-
         const freeContainer = document.getElementById("freeCropContainer");
-
         const freeImg = document.getElementById("freeCropImage");
-
-        const controlsRow = document.querySelector(".crop-controls-row");
 
         if (isFreeForm) {
           document.getElementById("cropModeTitle").innerText =
             "Perspective Crop Mode";
           btn.innerText = "Back to Standard Crop";
           btn.style.background = "#0ea5e9";
-
           if (cropper) {
             cropper.destroy();
             cropper = null;
           }
-
           normalImg.style.display = "none";
-
           freeContainer.style.display = "block";
-
-          if (cropMode === "combined") {
-            freeImg.src = normalImg.src;
-          } else {
-            freeImg.src = images[currentCropIndex].current;
-          }
-
-          freeImg.onload = () => {
-            setTimeout(initFreeCrop, 50);
-          };
-
-          if (freeImg.complete) {
-            setTimeout(initFreeCrop, 50);
-          }
+          freeImg.src =
+            cropMode === "combined"
+              ? normalImg.src
+              : images[currentCropIndex].current;
+          freeImg.onload = () => requestAnimationFrame(initFreeCrop);
+          if (freeImg.complete) requestAnimationFrame(initFreeCrop);
         } else {
           activeCorner = null;
-
-          btn.innerText = "Click to Perspective Crop";
+          btn.innerText = "Perspective Crop";
           btn.style.background = "#0ea5e9";
-
           freeContainer.style.display = "none";
-
           normalImg.style.display = "block";
+          if (cropMode === "combined") cropCombined();
+          else openCrop(currentCropIndex);
+        }
+      }
 
-          if (cropMode === "combined") {
-            cropCombined();
+      function resetToStandardUI() {
+        isFreeForm = false;
+        document.getElementById("cropModeTitle").innerText =
+          "Standard Crop Mode";
+        document.getElementById("toggleCropBtn").innerText = "Perspective Crop";
+        document.getElementById("toggleCropBtn").style.background = "#0ea5e9";
+        document.getElementById("freeCropContainer").style.display = "none";
+        document.getElementById("cropImage").style.display = "block";
+        document.querySelector(".crop-controls-row").style.display = "flex";
+      }
+
+      function closeCrop() {
+        document.getElementById("cropModal").style.display = "none";
+        if (cropper) {
+          cropper.destroy();
+          cropper = null;
+        }
+        document.getElementById("cropImage").removeAttribute("src");
+        document.getElementById("freeCropImage").removeAttribute("src");
+        resetToStandardUI();
+      }
+      //#endregion
+
+      // ==========================================
+      // #region 14. CROP HISTORY SYSTEM
+      // ==========================================
+      function saveCropState() {
+        if (!cropper || isRestoringHistory) return;
+        const state = cropper.getData();
+        const key =
+          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
+        if (!cropHistory[key]) cropHistory[key] = [];
+        if (!redoHistory[key]) redoHistory[key] = [];
+        const history = cropHistory[key];
+        const last = history[history.length - 1];
+        if (last && JSON.stringify(last) === JSON.stringify(state)) return;
+        history.push(JSON.parse(JSON.stringify(state)));
+        if (history.length > 50) history.shift();
+        redoHistory[key] = [];
+      }
+
+      function undoCrop() {
+        const key =
+          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
+        const history = cropHistory[key];
+        if (!history || history.length < 2) return;
+        const current = history.pop();
+        if (!redoHistory[key]) redoHistory[key] = [];
+        redoHistory[key].push(current);
+        isRestoringHistory = true;
+        cropper.setData(history[history.length - 1]);
+        requestAnimationFrame(() => {
+          isRestoringHistory = false;
+        });
+      }
+
+      function redoCrop() {
+        const key =
+          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
+        const redo = redoHistory[key];
+        if (!redo || redo.length === 0) return;
+        const next = redo.pop();
+        if (!cropHistory[key]) cropHistory[key] = [];
+        cropHistory[key].push(next);
+        isRestoringHistory = true;
+        cropper.setData(next);
+        requestAnimationFrame(() => {
+          isRestoringHistory = false;
+        });
+      }
+      //#endregion
+
+      // ==========================================
+      // #region 15. IMAGE TRANSFORM HELPERS
+      // ==========================================
+      function rotateImageSource(imgSource) {
+        const w = imgSource.naturalWidth || imgSource.width;
+        const h = imgSource.naturalHeight || imgSource.height;
+        const tc = document.createElement("canvas");
+        tc.width = h;
+        tc.height = w;
+        const c = tc.getContext("2d");
+        c.translate(tc.width / 2, tc.height / 2);
+        c.rotate((90 * Math.PI) / 180);
+        c.drawImage(imgSource, -w / 2, -h / 2);
+        return tc;
+      }
+
+      function flipImageSource(imgSource, direction) {
+        const w = imgSource.naturalWidth || imgSource.width;
+        const h = imgSource.naturalHeight || imgSource.height;
+        const tc = document.createElement("canvas");
+        tc.width = w;
+        tc.height = h;
+        const c = tc.getContext("2d");
+        if (direction === "horizontal") {
+          c.translate(w, 0);
+          c.scale(-1, 1);
+        } else {
+          c.translate(0, h);
+          c.scale(1, -1);
+        }
+        c.drawImage(imgSource, 0, 0, w, h);
+        return tc;
+      }
+      //#endregion
+
+      // ==========================================
+      // #region 16. IMAGE TRANSFORM SYSTEM
+      // ==========================================
+      async function rotateCrop() {
+        if (cropMode === "combined") {
+          showToast("Please rotate images before stitching", true);
+          return;
+        }
+        const btn = document.getElementById("rotateBtn");
+        if (btn) {
+          btn.innerText = "⏳";
+          btn.disabled = true;
+        }
+        await new Promise((r) => setTimeout(r, 10));
+        try {
+          const imgObj = images[currentCropIndex];
+          const sourceImg = new Image();
+          await new Promise((res) => {
+            sourceImg.onload = res;
+            sourceImg.src = imgObj.original;
+          });
+
+          const rotCanvas = rotateImageSource(sourceImg);
+          const bitmap = await canvasToBitmap(rotCanvas);
+          const tc = document.createElement("canvas");
+          tc.width = bitmap.width;
+          tc.height = bitmap.height;
+          tc.getContext("2d").drawImage(bitmap, 0, 0);
+
+          const blob = await new Promise((res) =>
+            tc.toBlob(res, "image/jpeg", 0.9),
+          );
+          const proxyUrl = URL.createObjectURL(blob);
+          bitmap.close();
+          cleanupCanvas(rotCanvas);
+          cleanupCanvas(tc);
+
+          if (imgObj.current && imgObj.current !== imgObj.pristineUrl)
+            revokeBlobUrl(imgObj.current);
+          if (
+            imgObj.original &&
+            imgObj.original !== imgObj.current &&
+            imgObj.original !== imgObj.pristineUrl
+          )
+            revokeBlobUrl(imgObj.original);
+
+          imgObj.current = proxyUrl;
+          imgObj.original = proxyUrl;
+          const newUiImg = new Image();
+          await new Promise((res) => {
+            newUiImg.onload = res;
+            newUiImg.src = proxyUrl;
+          });
+          imgObj.img = newUiImg;
+          // FIX: Update rawMeta dimensions after rotation
+          imgObj.rawMeta = {
+            file: blob,
+            width: newUiImg.naturalWidth,
+            height: newUiImg.naturalHeight,
+          };
+          imgObj.rawRatio = 1;
+          imgObj.cropData = null;
+          imgObj.freeFormData = null;
+          cropHistory[imgObj.id] = [];
+          redoHistory[imgObj.id] = [];
+
+          if (isFreeForm) {
+            const fi = document.getElementById("freeCropImage");
+            await new Promise((res) => {
+              fi.onload = res;
+              fi.src = proxyUrl;
+            });
+            setTimeout(initFreeCrop, 30);
           } else {
-            openCrop(currentCropIndex);
+            openCrop(currentCropIndex, true);
+          }
+          stitchDirty = true;
+          rerenderCanvas();
+          renderPreview();
+        } catch (e) {
+          console.error("Rotation failed:", e);
+          showToast("Rotation failed", true);
+        } finally {
+          if (btn) {
+            btn.innerText = "↻";
+            btn.disabled = false;
           }
         }
       }
 
-      // FREE FORM CROP LOGIC
-      const fCanvas = document.getElementById("freeCropCanvas");
+      async function flipCrop(direction) {
+        if (cropMode === "combined") {
+          showToast("Please flip images before stitching", true);
+          return;
+        }
+        const btnId = direction === "horizontal" ? "flipHBtn" : "flipVBtn";
+        const btn = document.getElementById(btnId);
+        const originalText = btn ? btn.innerText : "";
+        if (btn) {
+          btn.innerText = "⏳";
+          btn.disabled = true;
+        }
+        await new Promise((r) => setTimeout(r, 10));
+        try {
+          const imgObj = images[currentCropIndex];
+          const sourceImg = new Image();
+          await new Promise((res) => {
+            sourceImg.onload = res;
+            sourceImg.src = imgObj.original;
+          });
 
+          const flipCanvas = flipImageSource(sourceImg, direction);
+          const bitmap = await canvasToBitmap(flipCanvas);
+          const tc = document.createElement("canvas");
+          tc.width = bitmap.width;
+          tc.height = bitmap.height;
+          tc.getContext("2d").drawImage(bitmap, 0, 0);
+
+          const blob = await new Promise((res) =>
+            tc.toBlob(res, "image/jpeg", 0.9),
+          );
+          const proxyUrl = URL.createObjectURL(blob);
+          bitmap.close();
+          cleanupCanvas(flipCanvas);
+          cleanupCanvas(tc);
+
+          if (imgObj.current && imgObj.current !== imgObj.pristineUrl)
+            revokeBlobUrl(imgObj.current);
+          if (
+            imgObj.original &&
+            imgObj.original !== imgObj.current &&
+            imgObj.original !== imgObj.pristineUrl
+          )
+            revokeBlobUrl(imgObj.original);
+
+          imgObj.current = proxyUrl;
+          imgObj.original = proxyUrl;
+          const newUiImg = new Image();
+          await new Promise((res) => {
+            newUiImg.onload = res;
+            newUiImg.src = proxyUrl;
+          });
+          imgObj.img = newUiImg;
+          // FIX: Update rawMeta dimensions after flip
+          imgObj.rawMeta = {
+            file: blob,
+            width: newUiImg.naturalWidth,
+            height: newUiImg.naturalHeight,
+          };
+          imgObj.rawRatio = 1;
+          imgObj.cropData = null;
+          imgObj.freeFormData = null;
+          cropHistory[imgObj.id] = [];
+          redoHistory[imgObj.id] = [];
+
+          if (isFreeForm) {
+            const fi = document.getElementById("freeCropImage");
+            await new Promise((res) => {
+              fi.onload = res;
+              fi.src = proxyUrl;
+            });
+            setTimeout(initFreeCrop, 30);
+          } else {
+            openCrop(currentCropIndex, true);
+          }
+          stitchDirty = true;
+          rerenderCanvas();
+          renderPreview();
+        } catch (e) {
+          console.error("Flip failed:", e);
+          showToast("Flip failed", true);
+        } finally {
+          if (btn) {
+            btn.innerText = originalText;
+            btn.disabled = false;
+          }
+        }
+      }
+      //#endregion
+
+      // ==========================================
+      // #region 17. FREEFORM GEOMETRY
+      // ==========================================
+      function getMousePos(e) {
+        const rect = fCanvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+      }
+
+      function sortCorners(pts) {
+        const center = {
+          x: pts.reduce((s, p) => s + p.x, 0) / 4,
+          y: pts.reduce((s, p) => s + p.y, 0) / 4,
+        };
+        pts.sort(
+          (a, b) =>
+            Math.atan2(a.y - center.y, a.x - center.x) -
+            Math.atan2(b.y - center.y, b.x - center.x),
+        );
+        let topLeft = pts.reduce((prev, curr) =>
+          curr.x + curr.y < prev.x + prev.y ? curr : prev,
+        );
+        while (pts[0] !== topLeft) pts.push(pts.shift());
+        return pts;
+      }
+      //#endregion
+
+      // ==========================================
+      // #region 18. FREEFORM RENDERING
+      // ==========================================
       function initFreeCrop() {
         const img = document.getElementById("freeCropImage");
         const container = document.getElementById("freeCropContainer");
-
         if (container.clientWidth === 0 || img.naturalWidth === 0) {
-          setTimeout(initFreeCrop, 50);
+          requestAnimationFrame(initFreeCrop);
           return;
         }
 
         fCanvas.width = container.clientWidth;
         fCanvas.height = container.clientHeight;
-
         const imgRatio = img.naturalWidth / img.naturalHeight;
         const containerRatio = fCanvas.width / fCanvas.height;
-
         let drawW,
           drawH,
           offsetX = 0,
@@ -1293,8 +1886,6 @@
           drawW = drawH * imgRatio;
           offsetX = (fCanvas.width - drawW) / 2;
         }
-
-        // START AT CORNERS (0 margin instead of 10%)
         freeCorners = [
           { x: offsetX, y: offsetY },
           { x: offsetX + drawW, y: offsetY },
@@ -1305,172 +1896,142 @@
       }
 
       function drawFreeCrop() {
-        const ctx = fCanvas.getContext("2d");
-        ctx.clearRect(0, 0, fCanvas.width, fCanvas.height);
+        const c = fCanvas.getContext("2d");
+        c.clearRect(0, 0, fCanvas.width, fCanvas.height);
+        c.fillStyle = "rgba(0,0,0,0.6)";
+        c.beginPath();
+        c.rect(0, 0, fCanvas.width, fCanvas.height);
+        c.moveTo(freeCorners[0].x, freeCorners[0].y);
+        c.lineTo(freeCorners[3].x, freeCorners[3].y);
+        c.lineTo(freeCorners[2].x, freeCorners[2].y);
+        c.lineTo(freeCorners[1].x, freeCorners[1].y);
+        c.closePath();
+        c.fill("evenodd");
 
-        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-        ctx.beginPath();
-        ctx.rect(0, 0, fCanvas.width, fCanvas.height);
-        ctx.moveTo(freeCorners[0].x, freeCorners[0].y);
-        ctx.lineTo(freeCorners[3].x, freeCorners[3].y);
-        ctx.lineTo(freeCorners[2].x, freeCorners[2].y);
-        ctx.lineTo(freeCorners[1].x, freeCorners[1].y);
-        ctx.closePath();
-        ctx.fill("evenodd");
+        c.strokeStyle = "#0ea5e9";
+        c.lineWidth = 2;
+        c.beginPath();
+        c.moveTo(freeCorners[0].x, freeCorners[0].y);
+        c.lineTo(freeCorners[1].x, freeCorners[1].y);
+        c.lineTo(freeCorners[2].x, freeCorners[2].y);
+        c.lineTo(freeCorners[3].x, freeCorners[3].y);
+        c.closePath();
+        c.stroke();
 
-        ctx.strokeStyle = "#0ea5e9";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(freeCorners[0].x, freeCorners[0].y);
-        ctx.lineTo(freeCorners[1].x, freeCorners[1].y);
-        ctx.lineTo(freeCorners[2].x, freeCorners[2].y);
-        ctx.lineTo(freeCorners[3].x, freeCorners[3].y);
-        ctx.closePath();
-        ctx.stroke();
-
-        const handleRadius = 30;
-        const lineSize = 18;
-
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = "#3b82f6";
-
-        freeCorners.forEach((c, i) => {
-          // Transparent touch area
-          ctx.beginPath();
-
-          ctx.arc(c.x, c.y, handleRadius, 0, Math.PI * 2);
-
-          ctx.fillStyle = "rgba(120,140,255,0.22)";
-
-          ctx.fill();
-
-          ctx.beginPath();
-
-          // TOP LEFT
+        const hr = 30,
+          ls = 18;
+        c.lineWidth = 5;
+        c.strokeStyle = "#3b82f6";
+        freeCorners.forEach((p, i) => {
+          c.beginPath();
+          c.arc(p.x, p.y, hr, 0, Math.PI * 2);
+          c.fillStyle = "rgba(120,140,255,0.22)";
+          c.fill();
+          c.beginPath();
           if (i === 0) {
-            ctx.moveTo(c.x + lineSize, c.y);
-            ctx.lineTo(c.x, c.y);
-            ctx.lineTo(c.x, c.y + lineSize);
+            c.moveTo(p.x + ls, p.y);
+            c.lineTo(p.x, p.y);
+            c.lineTo(p.x, p.y + ls);
+          } else if (i === 1) {
+            c.moveTo(p.x - ls, p.y);
+            c.lineTo(p.x, p.y);
+            c.lineTo(p.x, p.y + ls);
+          } else if (i === 2) {
+            c.moveTo(p.x - ls, p.y);
+            c.lineTo(p.x, p.y);
+            c.lineTo(p.x, p.y - ls);
+          } else {
+            c.moveTo(p.x + ls, p.y);
+            c.lineTo(p.x, p.y);
+            c.lineTo(p.x, p.y - ls);
           }
-
-          // TOP RIGHT
-          else if (i === 1) {
-            ctx.moveTo(c.x - lineSize, c.y);
-            ctx.lineTo(c.x, c.y);
-            ctx.lineTo(c.x, c.y + lineSize);
-          }
-
-          // BOTTOM RIGHT
-          else if (i === 2) {
-            ctx.moveTo(c.x - lineSize, c.y);
-            ctx.lineTo(c.x, c.y);
-            ctx.lineTo(c.x, c.y - lineSize);
-          }
-
-          // BOTTOM LEFT
-          else if (i === 3) {
-            ctx.moveTo(c.x + lineSize, c.y);
-            ctx.lineTo(c.x, c.y);
-            ctx.lineTo(c.x, c.y - lineSize);
-          }
-
-          ctx.stroke();
+          c.stroke();
         });
       }
+      //#endregion
 
-      function getMousePos(e) {
-        const rect = fCanvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
-      }
-
-      fCanvas.addEventListener("mousedown", startDrag);
-      fCanvas.addEventListener("touchstart", startDrag, { passive: false });
-      fCanvas.addEventListener("mousemove", drag);
-      fCanvas.addEventListener("touchmove", drag, { passive: false });
-      window.addEventListener("mouseup", stopDrag);
-      window.addEventListener("touchend", stopDrag);
-
+      // ==========================================
+      // #region 19. FREEFORM INTERACTION
+      // ==========================================
       function startDrag(e) {
         if (!isFreeForm) return;
-
         const pos = getMousePos(e);
-
         let minDist = 65;
-
         activeCorner = null;
-
         freeCorners.forEach((c) => {
           const dist = Math.hypot(c.x - pos.x, c.y - pos.y);
-
           if (dist < minDist) {
             minDist = dist;
             activeCorner = c;
           }
         });
-
         if (activeCorner) {
-          // STORE RELATIVE OFFSET
           dragOffsetX = pos.x - activeCorner.x;
           dragOffsetY = pos.y - activeCorner.y;
-
           lastTouchX = pos.x;
           lastTouchY = pos.y;
-
           e.preventDefault();
         }
       }
 
       function drag(e) {
         if (!isFreeForm || !activeCorner) return;
-
         e.preventDefault();
-
         const pos = getMousePos(e);
-
-        // RELATIVE MOVEMENT
-        const dx = pos.x - lastTouchX;
-        const dy = pos.y - lastTouchY;
-
-        // SHARPSCAN-LIKE CONTROL
         const sensitivity = 0.5;
+        activeCorner.x += (pos.x - lastTouchX) * sensitivity;
+        activeCorner.y += (pos.y - lastTouchY) * sensitivity;
 
-        activeCorner.x += dx * sensitivity;
-        activeCorner.y += dy * sensitivity;
-
-        activeCorner.x = Math.max(0, Math.min(fCanvas.width, activeCorner.x));
-
-        activeCorner.y = Math.max(0, Math.min(fCanvas.height, activeCorner.y));
-
+        const img = document.getElementById("freeCropImage");
+        const imgRatio = img.naturalWidth / img.naturalHeight;
+        const containerRatio = fCanvas.width / fCanvas.height;
+        let drawW,
+          drawH,
+          offsetX = 0,
+          offsetY = 0;
+        if (imgRatio > containerRatio) {
+          drawW = fCanvas.width;
+          drawH = drawW / imgRatio;
+          offsetY = (fCanvas.height - drawH) / 2;
+        } else {
+          drawH = fCanvas.height;
+          drawW = drawH * imgRatio;
+          offsetX = (fCanvas.width - drawW) / 2;
+        }
+        activeCorner.x = Math.max(
+          offsetX,
+          Math.min(offsetX + drawW, activeCorner.x),
+        );
+        activeCorner.y = Math.max(
+          offsetY,
+          Math.min(offsetY + drawH, activeCorner.y),
+        );
         lastTouchX = pos.x;
         lastTouchY = pos.y;
-
-        drawFreeCrop();
+        requestAnimationFrame(drawFreeCrop);
       }
 
       function stopDrag() {
         activeCorner = null;
       }
+      //#endregion
 
-      // PURE MATH REVERSE-HOMOGRAPHY FLATTENER
+      // ==========================================
+      // #region 20. FREEFORM APPLY ENGINE
+      // ==========================================
       function applyFreeFormCrop() {
         const btn = document.getElementById("applyBtn");
-
         btn.innerText = "Applying Matrix...";
         btn.disabled = true;
 
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           const img = document.getElementById("freeCropImage");
-
           const imgRatio = img.naturalWidth / img.naturalHeight;
           const containerRatio = fCanvas.width / fCanvas.height;
-
           let drawW,
             drawH,
             offsetX = 0,
             offsetY = 0;
-
           if (imgRatio > containerRatio) {
             drawW = fCanvas.width;
             drawH = drawW / imgRatio;
@@ -1482,733 +2043,319 @@
           }
 
           const scale = img.naturalWidth / drawW;
-
-          function sortCorners(pts) {
-            const center = {
-              x: pts.reduce((s, p) => s + p.x, 0) / 4,
-              y: pts.reduce((s, p) => s + p.y, 0) / 4,
-            };
-
-            pts.sort((a, b) => {
-              const angleA = Math.atan2(a.y - center.y, a.x - center.x);
-              const angleB = Math.atan2(b.y - center.y, b.x - center.x);
-              return angleA - angleB;
-            });
-
-            let topLeft = pts.reduce((prev, curr) =>
-              curr.x + curr.y < prev.x + prev.y ? curr : prev,
-            );
-
-            while (pts[0] !== topLeft) {
-              pts.push(pts.shift());
-            }
-
-            return pts;
-          }
-
           const pts = sortCorners(
             freeCorners.map((c) => ({
               x: (c.x - offsetX) * scale,
               y: (c.y - offsetY) * scale,
             })),
           );
+
           const w1 = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
           const w2 = Math.hypot(pts[2].x - pts[3].x, pts[2].y - pts[3].y);
-
           const h1 = Math.hypot(pts[3].x - pts[0].x, pts[3].y - pts[0].y);
           const h2 = Math.hypot(pts[2].x - pts[1].x, pts[2].y - pts[1].y);
-
-          const avgTopBottom = (w1 + w2) / 2;
-          const avgLeftRight = (h1 + h2) / 2;
-
-          const aspectRatio = avgTopBottom / avgLeftRight;
-
-          const destW = Math.round(avgTopBottom);
-          const destH = Math.round(destW / aspectRatio);
+          const avgW = (w1 + w2) / 2,
+            avgH = (h1 + h2) / 2;
+          const destW = Math.round(avgW);
+          const destH = Math.max(
+            1,
+            Math.round(destW / Math.max(0.01, avgW / avgH)),
+          );
 
           const offscreen = document.createElement("canvas");
-
           offscreen.width = destW;
           offscreen.height = destH;
-
           const offCtx = offscreen.getContext("2d", {
             willReadFrequently: true,
           });
 
           const srcCanvas = document.createElement("canvas");
-
           srcCanvas.width = img.naturalWidth;
           srcCanvas.height = img.naturalHeight;
-
           srcCanvas
-            .getContext("2d", {
-              willReadFrequently: true,
-            })
+            .getContext("2d", { willReadFrequently: true })
             .drawImage(img, 0, 0);
-
           const srcData = srcCanvas
             .getContext("2d")
             .getImageData(0, 0, srcCanvas.width, srcCanvas.height);
-
           const destData = offCtx.createImageData(destW, destH);
-
           const srcBuf = new Uint32Array(srcData.data.buffer);
           const destBuf = new Uint32Array(destData.data.buffer);
-
-          const x0 = pts[0].x;
-          const y0 = pts[0].y;
-
-          const x1 = pts[1].x;
-          const y1 = pts[1].y;
-
-          const x2 = pts[2].x;
-          const y2 = pts[2].y;
-
-          const x3 = pts[3].x;
-          const y3 = pts[3].y;
-
-          const dx1 = x1 - x2;
-          const dx2 = x3 - x2;
-          const dx3 = x0 - x1 + x2 - x3;
-
-          const dy1 = y1 - y2;
-          const dy2 = y3 - y2;
-          const dy3 = y0 - y1 + y2 - y3;
-
-          let a11, a21, a31;
-          let a12, a22, a32;
-          let a13, a23, a33;
-
-          if (dx3 === 0 && dy3 === 0) {
-            a11 = x1 - x0;
-            a21 = x3 - x0;
-            a31 = x0;
-
-            a12 = y1 - y0;
-            a22 = y3 - y0;
-            a32 = y0;
-
-            a13 = 0;
-            a23 = 0;
-            a33 = 1;
-          } else {
-            const det = dx1 * dy2 - dx2 * dy1;
-
-            a13 = (dx3 * dy2 - dx2 * dy3) / det;
-            a23 = (dx1 * dy3 - dx3 * dy1) / det;
-
-            a11 = x1 - x0 + a13 * x1;
-            a21 = x3 - x0 + a23 * x3;
-            a31 = x0;
-
-            a12 = y1 - y0 + a13 * y1;
-            a22 = y3 - y0 + a23 * y3;
-            a32 = y0;
-
-            a33 = 1;
-          }
-
-          const sw = srcCanvas.width;
-          const sh = srcCanvas.height;
+          const sw = srcCanvas.width,
+            sh = srcCanvas.height;
 
           for (let y = 0; y < destH; y++) {
             const t = y / (destH - 1);
-
-            const leftX = pts[0].x + (pts[3].x - pts[0].x) * t;
-
-            const leftY = pts[0].y + (pts[3].y - pts[0].y) * t;
-
-            const rightX = pts[1].x + (pts[2].x - pts[1].x) * t;
-
-            const rightY = pts[1].y + (pts[2].y - pts[1].y) * t;
-
+            const lx = pts[0].x + (pts[3].x - pts[0].x) * t,
+              ly = pts[0].y + (pts[3].y - pts[0].y) * t;
+            const rx = pts[1].x + (pts[2].x - pts[1].x) * t,
+              ry = pts[1].y + (pts[2].y - pts[1].y) * t;
             for (let x = 0; x < destW; x++) {
               const s = x / (destW - 1);
-
-              const srcX = leftX + (rightX - leftX) * s;
-
-              const srcY = leftY + (rightY - leftY) * s;
-
-              if (srcX >= 0 && srcX < sw - 1 && srcY >= 0 && srcY < sh - 1) {
-                const ix = Math.floor(srcX);
-                const iy = Math.floor(srcY);
-
-                destBuf[y * destW + x] = srcBuf[iy * sw + ix];
+              const sx = lx + (rx - lx) * s,
+                sy = ly + (ry - ly) * s;
+              if (sx >= 0 && sx < sw - 1 && sy >= 0 && sy < sh - 1) {
+                // FIX: Bilinear interpolation for smooth perspective correction
+                const ix = Math.floor(sx),
+                  iy = Math.floor(sy);
+                const fx = sx - ix,
+                  fy = sy - iy;
+                const p00 = srcBuf[iy * sw + ix],
+                  p10 = srcBuf[iy * sw + (ix + 1)];
+                const p01 = srcBuf[(iy + 1) * sw + ix],
+                  p11 = srcBuf[(iy + 1) * sw + (ix + 1)];
+                const lerp = (a, b, t) => a + (b - a) * t;
+                const r = Math.round(
+                  lerp(
+                    lerp(p00 & 0xff, p10 & 0xff, fx),
+                    lerp(p01 & 0xff, p11 & 0xff, fx),
+                    fy,
+                  ),
+                );
+                const g = Math.round(
+                  lerp(
+                    lerp((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, fx),
+                    lerp((p01 >> 8) & 0xff, (p11 >> 8) & 0xff, fx),
+                    fy,
+                  ),
+                );
+                const b = Math.round(
+                  lerp(
+                    lerp((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, fx),
+                    lerp((p01 >> 16) & 0xff, (p11 >> 16) & 0xff, fx),
+                    fy,
+                  ),
+                );
+                const a = Math.round(
+                  lerp(
+                    lerp((p00 >> 24) & 0xff, (p10 >> 24) & 0xff, fx),
+                    lerp((p01 >> 24) & 0xff, (p11 >> 24) & 0xff, fx),
+                    fy,
+                  ),
+                );
+                destBuf[y * destW + x] = (a << 24) | (b << 16) | (g << 8) | r;
               }
             }
           }
 
           offCtx.putImageData(destData, 0, 0);
-
           offscreen.toBlob(
             (blob) => {
               const url = URL.createObjectURL(blob);
+              cleanupCanvas(srcCanvas);
+              cleanupCanvas(offscreen);
 
               if (cropMode === "combined") {
                 const finalImg = new Image();
-
                 finalImg.onload = () => {
                   canvas.width = finalImg.width;
                   canvas.height = finalImg.height;
-
                   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
                   ctx.drawImage(finalImg, 0, 0);
-
                   URL.revokeObjectURL(url);
-
+                  // FIX: Invalidate combined cache after perspective crop on canvas
+                  if (combinedCanvasCacheUrl) {
+                    URL.revokeObjectURL(combinedCanvasCacheUrl);
+                    combinedCanvasCacheUrl = null;
+                  }
                   closeCrop();
-
                   btn.innerText = "Apply";
                   btn.disabled = false;
                 };
-
                 finalImg.src = url;
               } else {
                 const imgObj = images[currentCropIndex];
-
-                if (imgObj.original && imgObj.original.startsWith("blob:")) {
+                if (imgObj.original?.startsWith("blob:"))
                   URL.revokeObjectURL(imgObj.original);
-                }
-
                 const previewUrl = URL.createObjectURL(blob);
-
                 const updatedImg = new Image();
-
                 updatedImg.onload = () => {
                   imgObj.current = previewUrl;
-
                   imgObj.original = previewUrl;
-
                   imgObj.img = updatedImg;
-
+                  // FIX: Update rawMeta after perspective crop
+                  imgObj.rawMeta = {
+                    file: blob,
+                    width: updatedImg.naturalWidth,
+                    height: updatedImg.naturalHeight,
+                  };
+                  imgObj.rawRatio = 1;
                   imgObj.cropData = null;
-
                   imgObj.freeFormData = true;
-
-                  rerenderCanvas();
-
                   renderPreview();
-
-                  closeCrop();
-
+                  openCrop(currentCropIndex, true);
                   btn.innerText = "Apply";
-
                   btn.disabled = false;
                 };
-
                 updatedImg.src = previewUrl;
-
-                rerenderCanvas();
-
-                renderPreview();
-
-                closeCrop();
-
-                btn.innerText = "Apply";
-
-                btn.disabled = false;
-
-                URL.revokeObjectURL(url);
               }
             },
             "image/png",
             1,
           );
-        }, 50);
-      }
-
-      function applyCrop() {
-        if (isFreeForm) {
-          applyFreeFormCrop();
-          return;
-        }
-
-        if (!cropper) return;
-
-        if (cropMode === "combined") {
-          applyCombinedCrop();
-          return;
-        }
-
-        const cropData = cropper.getData();
-
-        // STORE CROP ONLY
-        images[currentCropIndex].cropData = {
-          x: cropData.x,
-          y: cropData.y,
-          width: cropData.width,
-          height: cropData.height,
-        };
-
-        // CREATE PREVIEW IMAGE ONLY
-        const croppedCanvas = cropper.getCroppedCanvas();
-
-        croppedCanvas.toBlob(
-          (blob) => {
-            const previewUrl = URL.createObjectURL(blob);
-
-            const oldCurrent = images[currentCropIndex].current;
-
-            if (
-              oldCurrent &&
-              oldCurrent.startsWith("blob:") &&
-              oldCurrent !== images[currentCropIndex].original
-            ) {
-              URL.revokeObjectURL(oldCurrent);
-            }
-
-            // ONLY CHANGE PREVIEW
-            images[currentCropIndex].current = previewUrl;
-
-            // DO NOT REPLACE ORIGINAL IMAGE
-            // DO NOT CHANGE images[currentCropIndex].img
-
-            rerenderCanvas();
-
-            renderPreview();
-
-            closeCrop();
-          },
-          "image/webp",
-          0.85,
-        );
-      }
-
-      function applyCombinedCrop() {
-        const croppedCanvas = cropper.getCroppedCanvas();
-        canvas.width = croppedCanvas.width;
-        canvas.height = croppedCanvas.height;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(croppedCanvas, 0, 0);
-        closeCrop();
-      }
-
-      function resetCrop() {
-        // PERSPECTIVE RESET
-        if (isFreeForm) {
-          initFreeCrop();
-
-          return;
-        }
-
-        // STANDARD RESET
-        if (cropMode !== "image" || currentCropIndex === null) {
-          return;
-        }
-
-        const imgObj = images[currentCropIndex];
-
-        imgObj.cropData = null;
-
-        if (!imgObj.freeFormData) {
-          if (
-            imgObj.current &&
-            imgObj.current !== imgObj.original &&
-            imgObj.current.startsWith("blob:")
-          ) {
-            URL.revokeObjectURL(imgObj.current);
-          }
-
-          imgObj.current = imgObj.original;
-        }
-
-        renderPreview();
-
-        rerenderCanvas();
-
-        if (cropper) {
-          cropper.reset();
-
-          setTimeout(() => {
-            cropper.clear();
-            cropper.crop();
-          }, 30);
-        }
-      }
-
-      function undoCrop() {
-        const key =
-          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
-        const history = cropHistory[key];
-        if (!history || history.length < 2) return;
-        const current = history.pop();
-        if (!redoHistory[key]) redoHistory[key] = [];
-        redoHistory[key].push(current);
-        isRestoringHistory = true;
-        cropper.setData(history[history.length - 1]);
-        setTimeout(() => {
-          isRestoringHistory = false;
-        }, 50);
-      }
-
-      function redoCrop() {
-        const key =
-          cropMode === "combined" ? "combined" : images[currentCropIndex].id;
-        const redo = redoHistory[key];
-        if (!redo || redo.length === 0) return;
-        const next = redo.pop();
-        if (!cropHistory[key]) cropHistory[key] = [];
-        cropHistory[key].push(next);
-        isRestoringHistory = true;
-        cropper.setData(next);
-        setTimeout(() => {
-          isRestoringHistory = false;
-        }, 50);
-      }
-
-      function closeCrop() {
-        const modal = document.getElementById("cropModal");
-        modal.style.display = "none";
-        if (cropper) {
-          cropper.destroy();
-          cropper = null;
-        }
-        document.getElementById("cropImage").removeAttribute("src");
-        document.getElementById("freeCropImage").removeAttribute("src");
-        resetToStandardUI();
-      }
-
-      function saveCanvasAsGroup() {
-        if (isProcessing) return;
-        isProcessing = true;
-        if (canvas.width <= 1 || canvas.height <= 1) {
-          showToast("Please stitch images first", true);
-
-          isProcessing = false;
-
-          return;
-        }
-
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            isProcessing = false;
-            alert("This group is too large.");
-            return;
-          }
-          const dataUrl = URL.createObjectURL(blob);
-          const img = new Image();
-
-          img.onload = () => {
-            images = images.filter((item) => {
-              if (item.selected) {
-                if (item.original?.startsWith("blob:"))
-                  URL.revokeObjectURL(item.original);
-                if (
-                  item.current?.startsWith("blob:") &&
-                  item.current !== item.original
-                )
-                  URL.revokeObjectURL(item.current);
-                return false;
-              }
-              return true;
-            });
-
-            images.push({
-              id:
-                window.crypto && window.crypto.randomUUID
-                  ? window.crypto.randomUUID()
-                  : Date.now().toString(36),
-              original: dataUrl,
-              current: dataUrl,
-              img,
-              cropData: null,
-              isGroup: true,
-              selected: true,
-            });
-
-            const validIds = new Set(images.map((img) => img.id));
-            for (const key in cropHistory)
-              if (key !== "combined" && !validIds.has(key))
-                delete cropHistory[key];
-            for (const key in redoHistory)
-              if (key !== "combined" && !validIds.has(key))
-                delete redoHistory[key];
-
-            combineMode = null;
-            clearCanvas();
-            renderPreview();
-            if (images.length === 1) {
-              combineVertical(false);
-              combineMode = null;
-            }
-
-            showToast("Group Saved Successfully!");
-            isProcessing = false;
-          };
-          img.src = dataUrl;
-        }, "image/png");
-      }
-
-      let toastTimeout;
-
-      // Failsafe: If iOS freezes the timeout, tapping anywhere forces it to hide
-      /* document.addEventListener(
-        "touchstart",
-        () => {
-          const toast = document.getElementById("toastNotification");
-          if (toast && toast.classList.contains("show")) {
-            toast.classList.remove("show");
-          }
-        },
-        { passive: true },
-      ); */
-
-      function showToast(message, isError = false) {
-        const toast = document.getElementById("toastNotification");
-
-        clearTimeout(toastTimeout);
-        toast.classList.remove("show");
-
-        // Keep the text clean and white
-        toast.style.color = "#ffffff";
-        toast.innerHTML = isError ? `❌ ${message}` : `✅ ${message}`;
-
-        // Reset any background styling that might be lingering
-        toast.style.background = "";
-
-        void toast.offsetWidth;
-
-        toast.classList.add("show");
-
-        toastTimeout = setTimeout(() => {
-          toast.classList.remove("show");
-        }, 2000);
-      }
-
-      function validateCanvasSize() {
-        const limits = getDeviceLimits();
-        if (canvas.width * canvas.height > limits.area)
-          throw new Error("Canvas too large for this specific device OS");
-      }
-
-      async function exportCanvasBlob(type, quality = 0.9) {
-        if ("OffscreenCanvas" in window) {
-          const offscreen = new OffscreenCanvas(canvas.width, canvas.height);
-          const offCtx = offscreen.getContext("2d");
-          offCtx.drawImage(canvas, 0, 0);
-          return await offscreen.convertToBlob({ type, quality });
-        }
-        return await new Promise((resolve) => {
-          canvas.toBlob(resolve, type, quality);
         });
       }
+      //#endregion
 
-      /* async function downloadImage(e) {
-        if (canvas.width <= 1 || canvas.height <= 1) {
-          showToast("Nothing to export. Combine images first.", true);
-          return;
-        }
-        const btn = e.target;
-        const originalText = btn.innerText;
-        btn.innerText = "Processing...";
-        btn.style.opacity = "0.7";
-        btn.disabled = true;
-
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        try {
-          validateCanvasSize();
-          const qualityValue = Number(
-            document.getElementById("qualitySelect").value,
-          );
-          const exportFormat = qualityValue === 1 ? "image/png" : "image/jpeg";
-          const fileExtension = qualityValue === 1 ? "png" : "jpg";
-
-          const blob = await exportCanvasBlob(exportFormat, qualityValue);
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.download = `PicStitch_${Date.now()}.${fileExtension}`;
-          link.href = url;
-          link.click();
-
-          setTimeout(() => {
-            URL.revokeObjectURL(url);
-          }, 1000);
-          showToast("Image Saved Successfully!");
-        } catch (error) {
-          console.error("Export failed:", error);
-          showToast("File too large for device memory", true);
-        } finally {
-          btn.innerText = originalText;
-          btn.style.opacity = "1";
-          btn.disabled = false;
-        }
-      } */
-
+      // ==========================================
+      // #region 21. EXPORT ENGINE
+      // ==========================================
       async function downloadImage(e) {
+        if (isProcessing) return;
+        isProcessing = true;
+
+        flashButton(document.getElementById("exportImageBtn"));
         const btn = e.target;
         const originalText = btn.innerText;
         btn.innerText = "Processing...";
         btn.style.opacity = "0.7";
         btn.disabled = true;
-
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        lockUI(true);
+        await new Promise((r) => setTimeout(r, 50));
 
         try {
           document.body.style.transform = "translateZ(0)";
-
           await new Promise((r) => requestAnimationFrame(r));
-
           document.body.offsetHeight;
+
           const qualitySelect = document.getElementById("qualitySelect").value;
-
           const isPNG = qualitySelect === "png";
-
           const exportFormat = isPNG ? "image/png" : "image/jpeg";
-
           const quality = isPNG ? 1 : Number(qualitySelect);
-
           const fileExtension = isPNG ? "png" : "jpg";
 
-          // =========================================
-          // 1. EXPORT COMBINED STITCHED CANVAS
-          // =========================================
           if (canvas.width > 1 && canvas.height > 1) {
             validateCanvasSize();
-
-            const exportCanvas = document.createElement("canvas");
-
-            let maxExportWidth;
-
-            if (qualitySelect === "0.45") {
-              maxExportWidth = 1400;
-            } else if (qualitySelect === "0.65") {
-              maxExportWidth = 2200;
-            } else if (qualitySelect === "0.8") {
-              maxExportWidth = 3200;
+            let blob;
+            // FIX: Skip redundant canvas copy for PNG — export directly at native res
+            if (isPNG) {
+              blob = await exportCanvasBlob("image/png", 1);
             } else {
-              // PNG keeps original resolution
-              maxExportWidth = canvas.width;
+              let maxW;
+              if (qualitySelect === "0.45") maxW = 1400;
+              else if (qualitySelect === "0.65") maxW = 2200;
+              else maxW = 3200;
+              const scale = Math.min(1, maxW / canvas.width);
+              const ec = document.createElement("canvas");
+              ec.width = Math.round(canvas.width * scale);
+              ec.height = Math.round(canvas.height * scale);
+              const ec2 = ec.getContext("2d");
+              ec2.imageSmoothingEnabled = true;
+              ec2.imageSmoothingQuality = "high";
+              ec2.drawImage(canvas, 0, 0, ec.width, ec.height);
+              blob = await new Promise((r) =>
+                ec.toBlob(r, exportFormat, quality),
+              );
             }
+            if (!blob) throw new Error("Export failed");
 
-            const scale = Math.min(1, maxExportWidth / canvas.width);
-
-            exportCanvas.width = canvas.width * scale;
-            exportCanvas.height = canvas.height * scale;
-
-            const exportCtx = exportCanvas.getContext("2d");
-
-            exportCtx.imageSmoothingEnabled = true;
-            exportCtx.imageSmoothingQuality = "high";
-
-            exportCtx.drawImage(
-              canvas,
-              0,
-              0,
-              exportCanvas.width,
-              exportCanvas.height,
-            );
-
-            const blob = await new Promise((resolve) => {
-              exportCanvas.toBlob(resolve, exportFormat, quality);
-            });
             const file = new File(
               [blob],
               `PicStitch_${Date.now()}.${fileExtension}`,
               { type: exportFormat },
             );
-
-            // Check if the device supports native mobile sharing
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
               try {
-                await navigator.share({
-                  files: [file],
-                  title: "PicStitch Export",
-                });
+                await navigator.share({ files: [file] });
                 showToast("Shared Successfully!");
               } catch (err) {
-                console.log("User cancelled share or share failed.");
+                console.log("Share cancelled.");
               }
             } else {
               const url = URL.createObjectURL(blob);
               const link = document.createElement("a");
-
-              link.download = `PicStitch_${Date.now()}.${fileExtension}`;
+              link.download = file.name;
               link.href = url;
               link.click();
-
-              /*  link.href = url;
-            if (!isIOS) {
-              link.download = `PicStitch_${Date.now()}.${fileExtension}`;
-            }
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link); */
-
-              setTimeout(() => {
-                URL.revokeObjectURL(url);
-              }, 1000);
-
-              if (!isIOS) {
-                showToast("Image Saved Successfully!");
-              }
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+              if (!isIOS) showToast("Image Saved Successfully!");
             }
             return;
           }
 
-          // =========================================
-          // 2. EXPORT SELECTED IMAGES (Single or Multiple)
-          // =========================================
           const selectedImages = images.filter((img) => img.selected);
-
           if (selectedImages.length === 0) {
             showToast("No selected image to export", true);
             return;
           }
 
-          // Loop through all selected images and download them sequentially
+          const generatedFiles = [];
           for (let i = 0; i < selectedImages.length; i++) {
             const imgObj = selectedImages[i];
             const img = new Image();
-
             await new Promise((resolve, reject) => {
               img.onload = resolve;
               img.onerror = reject;
               img.src = imgObj.current;
             });
 
-            const tempCanvas = document.createElement("canvas");
-            tempCanvas.width = img.naturalWidth;
-            tempCanvas.height = img.naturalHeight;
-            const tempCtx = tempCanvas.getContext("2d");
-            tempCtx.drawImage(img, 0, 0);
+            const limits = getDeviceLimits();
+            let tw = img.naturalWidth,
+              th = img.naturalHeight,
+              ss = 1;
+            if (tw * th > limits.area) ss = Math.sqrt(limits.area / (tw * th));
+            if (th * ss > limits.dimension) ss = limits.dimension / th;
+            if (tw * ss > limits.dimension) ss = limits.dimension / tw;
 
-            const blob = await new Promise((resolve) => {
-              tempCanvas.toBlob(resolve, exportFormat, quality);
-            });
-
-            const url = URL.createObjectURL(blob);
-
-            const link = document.createElement("a");
-
-            link.download = `PicStitch_Selected_${Date.now()}_${i + 1}.${fileExtension}`;
-            link.href = url;
-            link.click();
-
-            /* link.href = url;
-            if (!isIOS) {
-              link.download = `PicStitch_${Date.now()}.${fileExtension}`;
-            }
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link); */
-
-            setTimeout(() => {
-              URL.revokeObjectURL(url);
-            }, 2000);
-
-            // Tiny delay to ensure mobile browsers register separate downloads cleanly
-            if (selectedImages.length > 1) {
-              await new Promise((resolve) => setTimeout(resolve, 250));
-            }
+            const tc = document.createElement("canvas");
+            tc.width = Math.round(tw * ss);
+            tc.height = Math.round(th * ss);
+            const tc2 = tc.getContext("2d");
+            tc2.imageSmoothingEnabled = true;
+            tc2.imageSmoothingQuality = "high";
+            tc2.drawImage(img, 0, 0, tc.width, tc.height);
+            const blob = await new Promise((r) =>
+              tc.toBlob(r, exportFormat, quality),
+            );
+            generatedFiles.push(
+              new File(
+                [blob],
+                `PicStitch_Selected_${Date.now()}_${i + 1}.${fileExtension}`,
+                { type: exportFormat },
+              ),
+            );
           }
 
-          if (!isIOS) {
-            showToast(
-              selectedImages.length > 1
-                ? "Selected Images Saved!"
-                : "Selected Image Saved!",
-            );
+          if (
+            navigator.canShare &&
+            navigator.canShare({ files: generatedFiles })
+          ) {
+            try {
+              await navigator.share({
+                files: generatedFiles,
+                title:
+                  selectedImages.length > 1
+                    ? "PicStitch Batch Export"
+                    : "PicStitch Export",
+              });
+              showToast(
+                selectedImages.length > 1
+                  ? "Images Shared Successfully!"
+                  : "Image Shared Successfully!",
+              );
+            } catch (err) {
+              console.log("Share cancelled.");
+            }
+          } else {
+            for (let i = 0; i < generatedFiles.length; i++) {
+              const file = generatedFiles[i];
+              const url = URL.createObjectURL(file);
+              const link = document.createElement("a");
+              link.download = file.name;
+              link.href = url;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              setTimeout(() => URL.revokeObjectURL(url), 2000);
+              if (generatedFiles.length > 1)
+                await new Promise((r) => setTimeout(r, 250));
+            }
+            if (!isIOS)
+              showToast(
+                generatedFiles.length > 1
+                  ? "Selected Images Saved!"
+                  : "Selected Image Saved!",
+              );
           }
         } catch (error) {
           console.error("Export failed:", error);
@@ -2218,139 +2365,224 @@
           btn.innerText = originalText;
           btn.style.opacity = "1";
           btn.disabled = false;
+          lockUI(false);
+          isProcessing = false;
+          releaseRawBitmaps();
         }
       }
 
       async function exportPDF(e) {
+        if (isProcessing) return;
+        isProcessing = true;
+        lockUI(true);
+
+        flashButton(document.getElementById("exportPdfBtn"));
         const btn = e.target;
         const originalText = btn.innerText;
         btn.innerText = "Processing...";
         btn.style.opacity = "0.7";
         btn.disabled = true;
-
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await new Promise((r) => setTimeout(r, 50));
 
         try {
           document.body.style.transform = "translateZ(0)";
-
           await new Promise((r) => requestAnimationFrame(r));
-
           document.body.offsetHeight;
-          const { jsPDF } = window.jspdf;
 
-          // =========================================
-          // 1. EXPORT COMBINED CANVAS (If stitched)
-          // =========================================
+          const { jsPDF } = window.jspdf;
+          const qualitySelect = document.getElementById("qualitySelect").value;
+          const isPNG = qualitySelect === "png";
+
+          /* const mimeType = isPNG ? "image/png" : "image/jpeg";
+          const jsPdfFormat = isPNG ? "PNG" : "JPEG";
+          const quality = isPNG ? 1 : Number(qualitySelect); */
+
+          const mimeType = "image/jpeg";
+          const jsPdfFormat = "JPEG";
+          const quality = qualitySelect === "png"
+            ? 0.92
+            : Number(qualitySelect);
+
           if (canvas.width > 1 && canvas.height > 1) {
             validateCanvasSize();
-
             const pdfWidth = 800;
-            const scale = pdfWidth / canvas.width;
-            const pdfHeight = canvas.height * scale;
-
+            const pdfHeight = canvas.height * (pdfWidth / canvas.width);
             const pdf = new jsPDF({
               orientation: pdfHeight > pdfWidth ? "portrait" : "landscape",
               unit: "px",
               format: [pdfWidth, pdfHeight],
             });
-
-            const blob = await exportCanvasBlob("image/jpeg", 0.75);
+            const blob = await exportCanvasBlob(mimeType, quality);
             const url = URL.createObjectURL(blob);
             const img = new Image();
-
             await new Promise((resolve, reject) => {
               img.onload = resolve;
               img.onerror = reject;
               img.src = url;
             });
-
-            pdf.addImage(img, "JPEG", 0, 0, pdfWidth, pdfHeight);
+            pdf.addImage(img, jsPdfFormat, 0, 0, pdfWidth, pdfHeight);
             URL.revokeObjectURL(url);
-
             const pdfBlob = pdf.output("blob");
-            const pdfUrl = URL.createObjectURL(pdfBlob);
-            const link = document.createElement("a");
-            link.download = `PicStitch_${Date.now()}.pdf`;
-            link.href = pdfUrl;
-
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            setTimeout(() => {
-              URL.revokeObjectURL(pdfUrl);
-            }, 1000);
-
-            if (!isIOS) {
-              showToast("PDF Saved Successfully!");
+            const file = new File([pdfBlob], `PicStitch_${Date.now()}.pdf`, {
+              type: "application/pdf",
+            });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              try {
+                await navigator.share({ files: [file] });
+                showToast("Shared Successfully!");
+              } catch (err) {
+                console.log("Share cancelled.");
+              }
+            } else {
+              const pdfUrl = URL.createObjectURL(pdfBlob);
+              const link = document.createElement("a");
+              link.download = file.name;
+              link.href = pdfUrl;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+              if (!isIOS) showToast("PDF Saved Successfully!");
             }
             return;
           }
 
-          // =========================================
-          // 2. EXPORT SINGLE SELECTED PHOTO
-          // =========================================
           const selectedImages = images.filter((img) => img.selected);
-
-          if (selectedImages.length > 1) {
-            showToast("Select one photo or Stitch photos", true);
-            return;
-          }
-
           if (selectedImages.length === 0) {
             showToast("No selected image to export", true);
             return;
           }
 
-          const imgObj = selectedImages[0];
-          const img = new Image();
+          let combineIntoOne = false;
+          if (selectedImages.length > 1) {
+            document.body.style.transform = "";
+            const choice = await getPdfExportChoice();
+            if (choice === "cancel") {
+              document.body.style.transform = "";
+              btn.innerText = originalText;
+              btn.style.opacity = "1";
+              btn.disabled = false;
+              return;
+            }
+            document.body.style.transform = "translateZ(0)";
+            combineIntoOne = choice === "combine";
+          }
 
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = imgObj.current;
-          });
-
-          // FIX: Draw to a temporary canvas to bake-in the correct EXIF rotation permanently
-          const tempCanvas = document.createElement("canvas");
-          tempCanvas.width = img.naturalWidth;
-          tempCanvas.height = img.naturalHeight;
-          const tempCtx = tempCanvas.getContext("2d");
-          tempCtx.drawImage(img, 0, 0);
-
-          // Grab the clean, flattened image data directly
-          const cleanImageData = tempCanvas.toDataURL("image/jpeg", 0.85);
-
-          const pdfWidth = 800;
-          const scale = pdfWidth / tempCanvas.width;
-          const pdfHeight = tempCanvas.height * scale;
-
-          const pdf = new jsPDF({
-            orientation: pdfHeight > pdfWidth ? "portrait" : "landscape",
-            unit: "px",
-            format: [pdfWidth, pdfHeight],
-          });
-
-          // Pass the flattened image to jsPDF
-          pdf.addImage(cleanImageData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-
-          const pdfBlob = pdf.output("blob");
-          const pdfUrl = URL.createObjectURL(pdfBlob);
-          const link = document.createElement("a");
-          link.download = `PicStitch_Single_${Date.now()}.pdf`;
-          link.href = pdfUrl;
-
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-          setTimeout(() => {
-            URL.revokeObjectURL(pdfUrl);
-          }, 1000);
-
-          if (!isIOS) {
-            showToast("PDF Saved Successfully!");
+          if (combineIntoOne) {
+            let pdf = null;
+            for (let i = 0; i < selectedImages.length; i++) {
+              const imgObj = selectedImages[i];
+              const exportImg = await getRawBitmap(imgObj);
+              const tc = document.createElement("canvas");
+              tc.width = exportImg.width;
+              tc.height = exportImg.height;
+              tc.getContext("2d").drawImage(exportImg, 0, 0);
+              const cleanData = tc.toDataURL(mimeType, quality);
+              const pdfW = 800,
+                pdfH = tc.height * (800 / tc.width);
+              const orient = pdfH > pdfW ? "portrait" : "landscape";
+              if (i === 0)
+                pdf = new jsPDF({
+                  orientation: orient,
+                  unit: "px",
+                  format: [pdfW, pdfH],
+                });
+              else pdf.addPage([pdfW, pdfH], orient);
+              pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
+            }
+            const pdfBlob = pdf.output("blob");
+            const file = new File(
+              [pdfBlob],
+              `PicStitch_MultiPage_${Date.now()}.pdf`,
+              { type: "application/pdf" },
+            );
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              try {
+                await navigator.share({
+                  files: [file],
+                  title: "PicStitch Multi-Page PDF",
+                });
+                showToast("PDF Shared Successfully!");
+              } catch (err) {
+                console.log("Share cancelled.");
+              }
+            } else {
+              const pdfUrl = URL.createObjectURL(pdfBlob);
+              const link = document.createElement("a");
+              link.download = file.name;
+              link.href = pdfUrl;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+              if (!isIOS) showToast("PDF Saved!");
+            }
+          } else {
+            const generatedFiles = [];
+            for (let i = 0; i < selectedImages.length; i++) {
+              const imgObj = selectedImages[i];
+              const exportImg = await getRawBitmap(imgObj);
+              const tc = document.createElement("canvas");
+              tc.width = exportImg.width;
+              tc.height = exportImg.height;
+              tc.getContext("2d").drawImage(exportImg, 0, 0);
+              const cleanData = tc.toDataURL(mimeType, quality);
+              const pdfW = 800,
+                pdfH = tc.height * (800 / tc.width);
+              const pdf = new jsPDF({
+                orientation: pdfH > pdfW ? "portrait" : "landscape",
+                unit: "px",
+                format: [pdfW, pdfH],
+              });
+              pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
+              const pdfBlob = pdf.output("blob");
+              generatedFiles.push(
+                new File(
+                  [pdfBlob],
+                  `PicStitch_Selected_${Date.now()}_${i + 1}.pdf`,
+                  { type: "application/pdf" },
+                ),
+              );
+            }
+            if (
+              navigator.canShare &&
+              navigator.canShare({ files: generatedFiles })
+            ) {
+              try {
+                await navigator.share({
+                  files: generatedFiles,
+                  title:
+                    selectedImages.length > 1
+                      ? "PicStitch Batch PDFs"
+                      : "PicStitch PDF",
+                });
+                showToast(
+                  selectedImages.length > 1
+                    ? "PDFs Shared Successfully!"
+                    : "PDF Shared Successfully!",
+                );
+              } catch (err) {
+                console.log("Share cancelled.");
+              }
+            } else {
+              for (let i = 0; i < generatedFiles.length; i++) {
+                const file = generatedFiles[i];
+                const url = URL.createObjectURL(file);
+                const link = document.createElement("a");
+                link.download = file.name;
+                link.href = url;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+                if (generatedFiles.length > 1)
+                  await new Promise((r) => setTimeout(r, 250));
+              }
+              if (!isIOS)
+                showToast(
+                  generatedFiles.length > 1 ? "PDFs Saved!" : "PDF Saved!",
+                );
+            }
           }
         } catch (error) {
           console.error("Export failed:", error);
@@ -2360,14 +2592,147 @@
           btn.innerText = originalText;
           btn.style.opacity = "1";
           btn.disabled = false;
+          lockUI(false);
+          isProcessing = false;
+          releaseRawBitmaps();
         }
       }
 
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./sw.js").catch((err) => {
-          console.error("SW registration failed:", err);
+      function saveCanvasAsGroup() {
+        flashButton(document.getElementById("saveGroupBtn"));
+        if (isProcessing) return;
+        isProcessing = true;
+        lockUI(true);
+
+        if (canvas.width <= 1 || canvas.height <= 1) {
+          showToast("Please stitch images first", true);
+          isProcessing = false;
+          lockUI(false);
+          return;
+        }
+
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            isProcessing = false;
+            lockUI(false);
+            alert("This group is too large.");
+            return;
+          }
+
+          const dataUrl = URL.createObjectURL(blob);
+          const img = new Image();
+
+          // FIX: Handle image load failure to guarantee UI unlock
+          img.onerror = () => {
+            isProcessing = false;
+            lockUI(false);
+            showToast("Failed to save group", true);
+          };
+
+          img.onload = () => {
+            try {
+              images = images.filter((item) => {
+                if (item.selected) {
+                  if (item.original?.startsWith("blob:"))
+                    URL.revokeObjectURL(item.original);
+                  if (
+                    item.current?.startsWith("blob:") &&
+                    item.current !== item.original
+                  )
+                    URL.revokeObjectURL(item.current);
+                  return false;
+                }
+                return true;
+              });
+
+              // FIX: Removed redundant pristineRawClone — it was never referenced anywhere
+              const pristineUiClone = new Image();
+              pristineUiClone.onerror = () => {
+                isProcessing = false;
+                lockUI(false);
+                showToast("Failed to save group", true);
+              };
+              pristineUiClone.onload = () => {
+                images.push({
+                  id: window.crypto?.randomUUID?.() ?? Date.now().toString(36),
+                  original: dataUrl,
+                  current: dataUrl,
+                  img,
+                  rawImg: img,
+                  rawRatio: 1,
+                  rawMeta: {
+                    file: blob,
+                    width: img.naturalWidth,
+                    height: img.naturalHeight,
+                  },
+                  pristineUrl: dataUrl,
+                  pristineImg: pristineUiClone,
+                  freeFormData: null,
+                  isGroup: true,
+                  selected: true,
+                });
+
+                const validIds = new Set(images.map((img) => img.id));
+                for (const key in cropHistory)
+                  if (key !== "combined" && !validIds.has(key))
+                    delete cropHistory[key];
+                for (const key in redoHistory)
+                  if (key !== "combined" && !validIds.has(key))
+                    delete redoHistory[key];
+
+                combineMode = null;
+                clearCanvas();
+                renderPreview();
+                if (images.length === 1) {
+                  combineVertical(false, false);
+                  combineMode = null;
+                }
+                showToast("Group Saved Successfully!");
+                isProcessing = false;
+                lockUI(false);
+              };
+              pristineUiClone.src = dataUrl;
+            } catch (err) {
+              console.error("saveCanvasAsGroup error:", err);
+              isProcessing = false;
+              lockUI(false);
+              showToast("Failed to save group", true);
+            }
+          };
+          img.src = dataUrl;
+        }, "image/png");
+      }
+
+      function getPdfExportChoice() {
+        return new Promise((resolve) => {
+          const modal = document.getElementById("pdfModal");
+          modal.style.display = "flex";
+          const cleanup = () => {
+            modal.style.display = "none";
+            document.getElementById("btnCombinePdf").onclick = null;
+            document.getElementById("btnSeparatePdf").onclick = null;
+            document.getElementById("btnCancelPdf").onclick = null;
+          };
+          document.getElementById("btnCombinePdf").onclick = () => {
+            cleanup();
+            resolve("combine");
+          };
+          document.getElementById("btnSeparatePdf").onclick = () => {
+            cleanup();
+            resolve("separate");
+          };
+          document.getElementById("btnCancelPdf").onclick = () => {
+            cleanup();
+            resolve("cancel");
+          };
         });
       }
+      //#endregion
+
+      // ==========================================
+      // #region 22. APP INITIALIZATION
+      // ==========================================
+      clearCanvas();
 
       window.addEventListener("beforeunload", () => {
         images.forEach((image) => {
@@ -2380,6 +2745,13 @@
             URL.revokeObjectURL(image.current);
         });
       });
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker
+          .register("./sw.js")
+          .catch((err) => console.error("SW registration failed:", err));
+      }
+      //#endregion
     </script>
   </body>
 </html>
