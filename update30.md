@@ -123,3 +123,6 @@ update 28
 
 update 29
 Bug fix and optimization
+
+update 30
+Remove android sharesheet and add direct download
