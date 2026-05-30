@@ -90,3 +90,36 @@ Optimize text and UI changes
 update 22
 Remove magnifier
 fix blank android preview 
+
+update 23
+Fix export image same file size even though after changing export quality
+Fix horizonatal and vertical stich do not appear in the canvas for more than 5 photos
+
+update 24
+Fix glitches and flickering in crop mode
+Fix export image and pdf quality according to export quality
+Add export selected images for export image and export pdf
+Add export pdf to choose combine pdf or separate pdf
+
+update 25
+Remove perspective crop in combined canvas
+Fix reset button not working in combined canvas
+Add rotate and flip button
+Rename Click to Perspective Crop to Perspective Crop
+Reduce font size of buttons and padding
+
+update 26
+CleanUp function v1
+
+update 27
+CleanUp function v2
+Standard Crop becomes permanent like Perspective Crop
+
+update 28
+1. Lazy Raw Image Loading
+2. Rerender Throttling
+3. DOM Diffing (vs. Rebuilding innerHTML)
+4. Reducing Blob Re-encodes
+
+update 29
+Bug fix and optimization
