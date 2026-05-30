@@ -2254,12 +2254,13 @@
               `PicStitch_${Date.now()}.${fileExtension}`,
               { type: exportFormat },
             );
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(
-              navigator.userAgent,
-            );
+            const isIOS =
+              /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === "MacIntel" &&
+                navigator.maxTouchPoints > 1);
 
             if (
-              isMobile &&
+              isIOS &&
               navigator.canShare &&
               navigator.canShare({ files: [file] })
             ) {
@@ -2274,7 +2275,9 @@
               const link = document.createElement("a");
               link.download = file.name;
               link.href = url;
+              document.body.appendChild(link);
               link.click();
+              document.body.removeChild(link);
               setTimeout(() => URL.revokeObjectURL(url), 1000);
               if (!isIOS) showToast("Image Saved Successfully!");
             }
@@ -2324,12 +2327,12 @@
             );
           }
 
-          const isMobile = /Android|iPhone|iPad|iPod/i.test(
-            navigator.userAgent,
-          );
+          const isIOS =
+            /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
           if (
-            isMobile &&
+            isIOS &&
             navigator.canShare &&
             navigator.canShare({ files: generatedFiles })
           ) {
@@ -2438,12 +2441,13 @@
             const file = new File([pdfBlob], `PicStitch_${Date.now()}.pdf`, {
               type: "application/pdf",
             });
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(
-              navigator.userAgent,
-            );
+            const isIOS =
+              /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === "MacIntel" &&
+                navigator.maxTouchPoints > 1);
 
             if (
-              isMobile &&
+              isIOS &&
               navigator.canShare &&
               navigator.canShare({ files: [file] })
             ) {
@@ -2523,12 +2527,13 @@
               `PicStitch_MultiPage_${Date.now()}.pdf`,
               { type: "application/pdf" },
             );
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(
-              navigator.userAgent,
-            );
+            const isIOS =
+              /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === "MacIntel" &&
+                navigator.maxTouchPoints > 1);
 
             if (
-              isMobile &&
+              isIOS &&
               navigator.canShare &&
               navigator.canShare({ files: [file] })
             ) {
@@ -2579,12 +2584,13 @@
                 ),
               );
             }
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(
-              navigator.userAgent,
-            );
+            const isIOS =
+              /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === "MacIntel" &&
+                navigator.maxTouchPoints > 1);
 
             if (
-              isMobile &&
+              isIOS &&
               navigator.canShare &&
               navigator.canShare({ files: generatedFiles })
             ) {
@@ -2767,6 +2773,7 @@
           };
         });
       }
+      
       //#endregion
 
       // ==========================================
