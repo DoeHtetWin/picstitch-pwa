@@ -601,8 +601,8 @@
       // ==========================================
       // #region 1. CONFIGURATION CONSTANTS
       // ==========================================
-      const APP_VERSION = "1.0.0"
-      
+      const APP_VERSION = "1.0.0";
+
       const isIOS =
         /iPad|iPhone|iPod/.test(navigator.userAgent) ||
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -2254,7 +2254,15 @@
               `PicStitch_${Date.now()}.${fileExtension}`,
               { type: exportFormat },
             );
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(
+              navigator.userAgent,
+            );
+
+            if (
+              isMobile &&
+              navigator.canShare &&
+              navigator.canShare({ files: [file] })
+            ) {
               try {
                 await navigator.share({ files: [file] });
                 showToast("Shared Successfully!");
@@ -2316,7 +2324,12 @@
             );
           }
 
+          const isMobile = /Android|iPhone|iPad|iPod/i.test(
+            navigator.userAgent,
+          );
+
           if (
+            isMobile &&
             navigator.canShare &&
             navigator.canShare({ files: generatedFiles })
           ) {
@@ -2399,9 +2412,8 @@
 
           const mimeType = "image/jpeg";
           const jsPdfFormat = "JPEG";
-          const quality = qualitySelect === "png"
-            ? 0.98
-            : Number(qualitySelect);
+          const quality =
+            qualitySelect === "png" ? 0.98 : Number(qualitySelect);
 
           if (canvas.width > 1 && canvas.height > 1) {
             validateCanvasSize();
@@ -2426,7 +2438,15 @@
             const file = new File([pdfBlob], `PicStitch_${Date.now()}.pdf`, {
               type: "application/pdf",
             });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(
+              navigator.userAgent,
+            );
+
+            if (
+              isMobile &&
+              navigator.canShare &&
+              navigator.canShare({ files: [file] })
+            ) {
               try {
                 await navigator.share({ files: [file] });
                 showToast("Shared Successfully!");
@@ -2503,7 +2523,15 @@
               `PicStitch_MultiPage_${Date.now()}.pdf`,
               { type: "application/pdf" },
             );
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(
+              navigator.userAgent,
+            );
+
+            if (
+              isMobile &&
+              navigator.canShare &&
+              navigator.canShare({ files: [file] })
+            ) {
               try {
                 await navigator.share({
                   files: [file],
@@ -2551,7 +2579,12 @@
                 ),
               );
             }
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(
+              navigator.userAgent,
+            );
+
             if (
+              isMobile &&
               navigator.canShare &&
               navigator.canShare({ files: generatedFiles })
             ) {
