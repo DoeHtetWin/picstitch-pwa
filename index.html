@@ -318,6 +318,9 @@
         background: #000;
         min-height: 0;
         min-width: 0;
+        /* THE FIX: Use margin instead of padding to create the Safe Zone */
+        margin: 12px 18px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
       }
       #cropImage {
         display: block;
@@ -353,22 +356,76 @@
       .crop-controls button:hover {
         background: #4f46e5;
       }
+      /* 1. Base style for all 8 crop handles */
       .cropper-point {
-        width: 38px !important;
-        height: 38px !important;
+        width: 30px !important;
+        height: 30px !important;
+        background-color: #4f46e5 !important;
         opacity: 1 !important;
-        background-color: #4f46e5 !important;
+        margin: 0 !important; /* Strip out Cropper's broken default margins */
       }
-      .cropper-line {
-        background-color: #4f46e5 !important;
+
+      /* Make the Top and Bottom middle points horizontal rectangles */
+      .cropper-point.point-n,
+      .cropper-point.point-s {
+        width: 32px !important;   /* Stretch it wide */
+        height: 24px !important;  /* Cut the height in half */
       }
+
+      /* Make the Left and Right middle points vertical rectangles */
+      .cropper-point.point-e,
+      .cropper-point.point-w {
+        width: 24px !important;   /* Cut the width in half */
+        height: 32px !important;  /* Stretch it tall */
+      }
+
+      /* 2. Lock the anchor coordinates to exactly 0 or 50% along the crop box */
+      .cropper-point.point-nw { top: 0 !important; left: 0 !important; }
+      .cropper-point.point-n  { top: 0 !important; left: 50% !important; }
+      .cropper-point.point-ne { top: 0 !important; right: 0 !important; }
+      .cropper-point.point-e  { top: 50% !important; right: 0 !important; }
+      .cropper-point.point-se { bottom: 0 !important; right: 0 !important; }
+      .cropper-point.point-s  { bottom: 0 !important; left: 50% !important; }
+      .cropper-point.point-sw { bottom: 0 !important; left: 0 !important; }
+      .cropper-point.point-w  { top: 50% !important; left: 0 !important; }
+
+      /* 3. Shift them to sit completely INSIDE the crop box */
+      .cropper-point.point-nw { transform: translate(0, 0); }
+      .cropper-point.point-n  { transform: translate(-50%, 0); }
+      .cropper-point.point-ne { transform: translate(0, 0); }
+      .cropper-point.point-e  { transform: translate(0, -50%); }
+      .cropper-point.point-se { transform: translate(0, 0); }
+      .cropper-point.point-s  { transform: translate(-50%, 0); }
+      .cropper-point.point-sw { transform: translate(0, 0); }
+      .cropper-point.point-w  { transform: translate(0, -50%); }
+
       .cropper-point.point-se {
         width: 32px !important;
         height: 32px !important;
       }
+      /* 1. Remove the old outline and shadow */
       .cropper-view-box {
-        outline: 2px solid #4f46e5 !important;
+        outline: none !important;
+        box-shadow: none !important; 
       }
+
+      /* 2. Draw a perfect frame ON TOP of the image */
+      .cropper-view-box::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border: 2px solid #4f46e5; /* The blue line */
+        pointer-events: none; /* Lets your finger clicks pass through to the crop box */
+      }
+
+      /* 3. Keep the invisible hitboxes for easy dragging */
+      .cropper-line {
+        background-color: transparent !important; 
+      }
+
       .cropper-face {
         background: rgba(79, 70, 229, 0.15) !important;
       }
@@ -1287,7 +1344,7 @@
             cropend() {
               saveCropState();
             },
-            viewMode: 0,
+            viewMode: 1,
             autoCropArea: 1,
             responsive: true,
             background: false,
@@ -1380,7 +1437,7 @@
               ];
               redoHistory["combined"] = [];
             },
-            viewMode: 0,
+            viewMode: 1,
             autoCropArea: 1,
             responsive: true,
             background: false,
@@ -1447,17 +1504,24 @@
         imgObj.current = uiUrl;
         imgObj.img = uiImg;
 
-        // FIX: Update rawBitmap and rawMeta so stitching stays accurate after crop
-
         if (imgObj.rawBitmap) {
           try {
             imgObj.rawBitmap.close();
           } catch (e) {}
         }
 
-        imgObj.rawBitmap = null;
+        imgObj.rawBitmap = await createImageBitmap(rawCanvas);
+
+        imgObj.rawMeta = {
+          file: uiBlob,
+          width: rawCanvas.width,
+          height: rawCanvas.height,
+        };
+
+        imgObj.rawRatio = 1;
 
         cleanupCanvas(rawCanvas);
+
         imgObj.freeFormData = null;
         cropHistory[imgObj.id] = [];
         redoHistory[imgObj.id] = [];
@@ -1886,11 +1950,13 @@
           drawW = drawH * imgRatio;
           offsetX = (fCanvas.width - drawW) / 2;
         }
+      // A tiny 2px pad keeps the stroke fully inside the canvas
+        const p = 2; 
         freeCorners = [
-          { x: offsetX, y: offsetY },
-          { x: offsetX + drawW, y: offsetY },
-          { x: offsetX + drawW, y: offsetY + drawH },
-          { x: offsetX, y: offsetY + drawH },
+          { x: offsetX + p, y: offsetY + p },
+          { x: offsetX + drawW - p, y: offsetY + p },
+          { x: offsetX + drawW - p, y: offsetY + drawH - p },
+          { x: offsetX + p, y: offsetY + drawH - p },
         ];
         drawFreeCrop();
       }
@@ -1909,7 +1975,7 @@
         c.fill("evenodd");
 
         c.strokeStyle = "#0ea5e9";
-        c.lineWidth = 2;
+        c.lineWidth = 2.5;
         c.beginPath();
         c.moveTo(freeCorners[0].x, freeCorners[0].y);
         c.lineTo(freeCorners[1].x, freeCorners[1].y);
@@ -1920,7 +1986,7 @@
 
         const hr = 30,
           ls = 18;
-        c.lineWidth = 5;
+        c.lineWidth = 4;
         c.strokeStyle = "#3b82f6";
         freeCorners.forEach((p, i) => {
           c.beginPath();
@@ -1998,14 +2064,17 @@
           drawW = drawH * imgRatio;
           offsetX = (fCanvas.width - drawW) / 2;
         }
+
+        const p = 2;
         activeCorner.x = Math.max(
-          offsetX,
-          Math.min(offsetX + drawW, activeCorner.x),
+          offsetX + p,
+          Math.min(offsetX + drawW - p, activeCorner.x),
         );
         activeCorner.y = Math.max(
-          offsetY,
-          Math.min(offsetY + drawH, activeCorner.y),
+          offsetY + p,
+          Math.min(offsetY + drawH - p, activeCorner.y),
         );
+
         lastTouchX = pos.x;
         lastTouchY = pos.y;
         requestAnimationFrame(drawFreeCrop);
@@ -2054,17 +2123,37 @@
           const w2 = Math.hypot(pts[2].x - pts[3].x, pts[2].y - pts[3].y);
           const h1 = Math.hypot(pts[3].x - pts[0].x, pts[3].y - pts[0].y);
           const h2 = Math.hypot(pts[2].x - pts[1].x, pts[2].y - pts[1].y);
-          const avgW = (w1 + w2) / 2,
-            avgH = (h1 + h2) / 2;
-          const destW = Math.round(avgW);
-          const destH = Math.max(
-            1,
-            Math.round(destW / Math.max(0.01, avgW / avgH)),
-          );
+
+          const wMax = Math.max(w1, w2);
+          const wMin = Math.min(w1, w2);
+          const hMax = Math.max(h1, h2);
+          const hMin = Math.min(h1, h2);
+
+          // Calculate convergence to detect optical foreshortening.
+          // Clamped to 0.15 to prevent memory crashes on extreme perspective drags.
+          const vConverge = wMax > 0 ? Math.max(0.25, wMin / wMax) : 1; 
+          const hConverge = hMax > 0 ? Math.max(0.25, hMin / hMax) : 1;
+
+          // Expand the dimensions using the inverse square root of the convergence.
+          // This elegantly undoes the optical depth compression to recover true aspect ratio.
+          const destW = Math.round(wMax * (1 / Math.sqrt(hConverge)));
+          const destH = Math.round(hMax * (1 / Math.sqrt(vConverge)));
 
           const offscreen = document.createElement("canvas");
           offscreen.width = destW;
           offscreen.height = destH;
+
+          /* const limits = getDeviceLimits();
+
+          if (destW * destH > limits.area) {
+            const scale = Math.sqrt(
+              limits.area / (destW * destH)
+            );
+
+            destW = Math.round(destW * scale);
+            destH = Math.round(destH * scale);
+          } */
+
           const offCtx = offscreen.getContext("2d", {
             willReadFrequently: true,
           });
@@ -2084,56 +2173,77 @@
           const sw = srcCanvas.width,
             sh = srcCanvas.height;
 
+          // 1. Extract the four corners
+          const x0 = pts[0].x, y0 = pts[0].y;
+          const x1 = pts[1].x, y1 = pts[1].y;
+          const x2 = pts[2].x, y2 = pts[2].y;
+          const x3 = pts[3].x, y3 = pts[3].y;
+
+          // 2. Calculate algebraic projective coefficients
+          const dx1 = x1 - x2;
+          const dx2 = x3 - x2;
+          const sumX = x0 - x1 + x2 - x3;
+
+          const dy1 = y1 - y2;
+          const dy2 = y3 - y2;
+          const sumY = y0 - y1 + y2 - y3;
+
+          const D = (dx1 * dy2) - (dx2 * dy1);
+          
+          let g = 0, h = 0;
+          if (D !== 0) {
+            g = ((sumX * dy2) - (sumY * dx2)) / D;
+            h = ((sumY * dx1) - (sumX * dy1)) / D;
+          }
+
+          const a = x1 - x0 + g * x1;
+          const b = x3 - x0 + h * x3;
+          const c = x0;
+          const d = y1 - y0 + g * y1;
+          const e = y3 - y0 + h * y3;
+          const f = y0;
+
+          // 3. Render the pixels using true perspective mapping
           for (let y = 0; y < destH; y++) {
-            const t = y / (destH - 1);
-            const lx = pts[0].x + (pts[3].x - pts[0].x) * t,
-              ly = pts[0].y + (pts[3].y - pts[0].y) * t;
-            const rx = pts[1].x + (pts[2].x - pts[1].x) * t,
-              ry = pts[1].y + (pts[2].y - pts[1].y) * t;
+            const v = y / (destH - 1 || 1);
             for (let x = 0; x < destW; x++) {
-              const s = x / (destW - 1);
-              const sx = lx + (rx - lx) * s,
-                sy = ly + (ry - ly) * s;
+              const u = x / (destW - 1 || 1);
+              
+              // Apply perspective division
+              const w = g * u + h * v + 1;
+              const sx = (a * u + b * v + c) / w;
+              const sy = (d * u + e * v + f) / w;
+
+              // Keep your excellent Bilinear sub-pixel interpolation!
               if (sx >= 0 && sx < sw - 1 && sy >= 0 && sy < sh - 1) {
-                // FIX: Bilinear interpolation for smooth perspective correction
-                const ix = Math.floor(sx),
-                  iy = Math.floor(sy);
-                const fx = sx - ix,
-                  fy = sy - iy;
-                const p00 = srcBuf[iy * sw + ix],
-                  p10 = srcBuf[iy * sw + (ix + 1)];
-                const p01 = srcBuf[(iy + 1) * sw + ix],
-                  p11 = srcBuf[(iy + 1) * sw + (ix + 1)];
-                const lerp = (a, b, t) => a + (b - a) * t;
-                const r = Math.round(
-                  lerp(
-                    lerp(p00 & 0xff, p10 & 0xff, fx),
-                    lerp(p01 & 0xff, p11 & 0xff, fx),
-                    fy,
-                  ),
-                );
-                const g = Math.round(
-                  lerp(
-                    lerp((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, fx),
-                    lerp((p01 >> 8) & 0xff, (p11 >> 8) & 0xff, fx),
-                    fy,
-                  ),
-                );
-                const b = Math.round(
-                  lerp(
-                    lerp((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, fx),
-                    lerp((p01 >> 16) & 0xff, (p11 >> 16) & 0xff, fx),
-                    fy,
-                  ),
-                );
-                const a = Math.round(
-                  lerp(
-                    lerp((p00 >> 24) & 0xff, (p10 >> 24) & 0xff, fx),
-                    lerp((p01 >> 24) & 0xff, (p11 >> 24) & 0xff, fx),
-                    fy,
-                  ),
-                );
-                destBuf[y * destW + x] = (a << 24) | (b << 16) | (g << 8) | r;
+                const ix = Math.floor(sx), iy = Math.floor(sy);
+                const fx = sx - ix, fy = sy - iy;
+                
+                const p00 = srcBuf[iy * sw + ix];
+                const p10 = srcBuf[iy * sw + (ix + 1)];
+                const p01 = srcBuf[(iy + 1) * sw + ix];
+                const p11 = srcBuf[(iy + 1) * sw + (ix + 1)];
+                
+                const lerp = (v1, v2, t) => v1 + (v2 - v1) * t;
+                
+                const r = Math.round(lerp(
+                  lerp(p00 & 0xff, p10 & 0xff, fx),
+                  lerp(p01 & 0xff, p11 & 0xff, fx), fy
+                ));
+                const green = Math.round(lerp(
+                  lerp((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, fx),
+                  lerp((p01 >> 8) & 0xff, (p11 >> 8) & 0xff, fx), fy
+                ));
+                const blue = Math.round(lerp(
+                  lerp((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, fx),
+                  lerp((p01 >> 16) & 0xff, (p11 >> 16) & 0xff, fx), fy
+                ));
+                const alpha = Math.round(lerp(
+                  lerp((p00 >> 24) & 0xff, (p10 >> 24) & 0xff, fx),
+                  lerp((p01 >> 24) & 0xff, (p11 >> 24) & 0xff, fx), fy
+                ));
+                
+                destBuf[y * destW + x] = (alpha << 24) | (blue << 16) | (green << 8) | r;
               }
             }
           }
@@ -2170,9 +2280,18 @@
                 const previewUrl = URL.createObjectURL(blob);
                 const updatedImg = new Image();
                 updatedImg.onload = () => {
-                  imgObj.current = previewUrl;
-                  imgObj.original = previewUrl;
-                  imgObj.img = updatedImg;
+                imgObj.current = previewUrl;
+                imgObj.original = previewUrl;
+                imgObj.img = updatedImg;
+
+                if (imgObj.rawBitmap) {
+                  try {
+                    imgObj.rawBitmap.close();
+                  } catch (e) {}
+                }
+
+                imgObj.rawBitmap = null;
+                  
                   // FIX: Update rawMeta after perspective crop
                   imgObj.rawMeta = {
                     file: blob,
@@ -2195,6 +2314,7 @@
           );
         });
       }
+      
       //#endregion
 
       // ==========================================
