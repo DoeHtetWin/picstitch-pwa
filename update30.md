@@ -126,3 +126,8 @@ Bug fix and optimization
 
 update 30
 Remove android sharesheet and add direct download
+
+update 31
+- Perspective crop (Bilinear Warp  to Projective Transformation (Homography))
+- Crop handles and line fix for both standard and perspective
+- .crop-body {margin: 12px}
