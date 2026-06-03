@@ -1,4 +1,4 @@
-const CACHE_NAME = "picstitch-v32.7"; 
+const CACHE_NAME = "picstitch-v32.8"; 
 
 const ASSETS_TO_CACHE = [
   "./",
