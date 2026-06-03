@@ -1,8 +1,5 @@
-// Change this number EVERY time you update the app!
-const CACHE_NAME = "picstitch-v31.3"; 
+const CACHE_NAME = "picstitch-v34.4"; 
 
-// CRITICAL: Every single file must be spelled perfectly. 
-// If even one file is missing, iOS will refuse to work offline.
 const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
@@ -12,10 +9,10 @@ const ASSETS_TO_CACHE = [
   "./mobile-drag-drop.js",
   "./cropper.min.js",
   "./jspdf.umd.min.js",
-  "./image/logo-192.png" // Make sure this folder and file exist!
+  "./image/logo-192.png" 
 ];
 
-// Step 1: Install the Service Worker and download the files into memory
+// Step 1: Install and Cache
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -23,11 +20,11 @@ self.addEventListener("install", (event) => {
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
-  // Force the waiting service worker to become the active service worker.
+  // Force the waiting service worker to become the active service worker IMMEDIATELY
   self.skipWaiting(); 
 });
 
-// Step 2: Clean up old versions of the app to free up phone storage
+// Step 2: Clean up old versions
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -41,22 +38,18 @@ self.addEventListener("activate", (event) => {
       );
     })
   );
-  self.clients.claim();
+  // Ensure the new service worker immediately takes control of all open pages
+  event.waitUntil(clients.claim());
 });
 
-// Step 3: THE IOS FIX - Intercept network requests and serve from cache!
+// Step 3: Intercept network requests
 self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // 1. If the file is in the offline cache, instantly return it
       if (cachedResponse) {
         return cachedResponse;
       }
-      
-      // 2. If it's not in the cache, try to fetch it from the internet
       return fetch(event.request).catch(() => {
-        // 3. If the internet is off AND it's not cached, 
-        // silently fail instead of crashing the app
         console.log("Offline and file not found in cache:", event.request.url);
       });
     })
