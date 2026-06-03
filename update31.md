@@ -131,3 +131,6 @@ update 31
 - Perspective crop (Bilinear Warp  to Projective Transformation (Homography))
 - Crop handles and line fix for both standard and perspective
 - .crop-body {margin: 12px}
+- fix reset perspective crop back to standard crop
+- force updates on iOS of pwa update 
+- fix sw.js
