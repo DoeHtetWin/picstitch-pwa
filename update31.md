@@ -134,3 +134,40 @@ update 31
 - fix reset perspective crop back to standard crop
 - force updates on iOS of pwa update 
 - fix sw.js
+
+update 32
+- fix performace loop 
+from
+// 3. Render the pixels using true perspective mapping
+          for (let y = 0; y < destH; y++) {
+            const v = y / (destH - 1 || 1);
+            for (let x = 0; x < destW; x++) {
+              const u = x / (destW - 1 || 1);
+
+              // Apply perspective division
+              const w = g * u + h * v + 1;
+              const sx = (a * u + b * v + c) / w;
+              const sy = (d * u + e * v + f) / w;
+
+              // Keep your excellent Bilinear sub-pixel interpolation!
+              if (sx >= 0 && sx < sw - 1 && sy >= 0 && sy < sh - 1) {
+
+to 
+
+// Define boundaries outside the loop to save millions of calculations
+          const maxSw = sw - 1;
+          const maxSh = sh - 1;
+
+// 3. Render the pixels using true perspective mapping
+          for (let y = 0; y < destH; y++) {
+            const v = y / (destH - 1 || 1);
+            for (let x = 0; x < destW; x++) {
+              const u = x / (destW - 1 || 1);
+              
+              // Apply perspective division
+              const w = g * u + h * v + 1;
+              const sx = (a * u + b * v + c) / w;
+              const sy = (d * u + e * v + f) / w;
+
+              // Keep your excellent Bilinear sub-pixel interpolation!
+              if (sx >= 0 && sx < maxSw && sy >= 0 && sy < maxSh) {
