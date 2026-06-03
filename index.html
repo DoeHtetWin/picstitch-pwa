@@ -1565,7 +1565,16 @@
         const imgObj = images[currentCropIndex];
         cropHistory[imgObj.id] = [];
         redoHistory[imgObj.id] = [];
-        if (isFreeForm) toggleCropMode();
+
+        // if (isFreeForm) toggleCropMode();
+
+        if (isFreeForm) {
+          // Reset the 4 points to their original corners and stay in Perspective Mode
+          initFreeCrop();
+          showToast("Points Reset!");
+          return; // Exit early so we don't open the standard cropper
+        }
+
         openCrop(currentCropIndex, true);
         renderPreview();
         rerenderCanvas();
