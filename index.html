@@ -215,7 +215,7 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        backdrop-filter: blur(4px);
+        /* backdrop-filter: blur(4px); */
       }
       .preview-delete:hover {
         background: rgb(239, 68, 68);
@@ -549,7 +549,7 @@
           <option value="0.45">Low Quality JPG</option>
           <option value="0.65" selected>Medium Quality JPG</option>
           <option value="0.8">High Quality JPG</option>
-          <option value="png">Lossless Huge PNG</option>
+          <option value="webp">Higher Quality WebP</option>
         </select>
       </div>
       <div
@@ -748,6 +748,7 @@
         if (isAndroid) return { area: 35000000, dimension: 8192 };
         return { area: 40000000, dimension: 16000 };
       }
+
       //#endregion
 
       // ==========================================
@@ -785,6 +786,7 @@
         if (canvas.width * canvas.height > limits.area)
           throw new Error("Canvas too large for this device");
       }
+
       //#endregion
 
       // ==========================================
@@ -810,15 +812,19 @@
         if (!imgObj) return;
         revokeBlobUrl(imgObj.current);
         if (imgObj.original !== imgObj.current) revokeBlobUrl(imgObj.original);
+
+        // Add this line to clear the ghost reference!
+        if (
+          imgObj.pristineUrl &&
+          imgObj.pristineUrl !== imgObj.current &&
+          imgObj.pristineUrl !== imgObj.original
+        ) {
+          revokeBlobUrl(imgObj.pristineUrl);
+        }
         if (imgObj.img instanceof HTMLCanvasElement) cleanupCanvas(imgObj.img);
         imgObj.img = null;
       }
       async function exportCanvasBlob(type, quality = 0.9) {
-        if ("OffscreenCanvas" in window) {
-          const offscreen = new OffscreenCanvas(canvas.width, canvas.height);
-          offscreen.getContext("2d").drawImage(canvas, 0, 0);
-          return await offscreen.convertToBlob({ type, quality });
-        }
         return await new Promise((resolve) =>
           canvas.toBlob(resolve, type, quality),
         );
@@ -926,17 +932,17 @@
 
         for (const file of files) {
           try {
-            const objectUrl = URL.createObjectURL(file);
-            const rawImg = new Image();
-            await new Promise((resolve, reject) => {
-              rawImg.onload = resolve;
-              rawImg.onerror = reject;
-              rawImg.src = objectUrl;
-            });
+            // Decode the image completely off the main thread!
+            const rawBitmap = await createImageBitmap(file);
 
-            const maxUiDim = 2500;
-            let uiW = rawImg.naturalWidth,
-              uiH = rawImg.naturalHeight;
+            // 1. Capture original dimensions before doing any math
+            const originalWidth = rawBitmap.width;
+            const originalHeight = rawBitmap.height;
+
+            const maxUiDim = 8000;
+            let uiW = originalWidth,
+              uiH = originalHeight;
+
             if (uiW > maxUiDim || uiH > maxUiDim) {
               const scale = Math.min(maxUiDim / uiW, maxUiDim / uiH);
               uiW *= scale;
@@ -949,8 +955,11 @@
             const resizeCtx = resizeCanvas.getContext("2d", { alpha: false });
             resizeCtx.imageSmoothingEnabled = true;
             resizeCtx.imageSmoothingQuality = "high";
-            resizeCtx.drawImage(rawImg, 0, 0, uiW, uiH);
 
+            resizeCtx.drawImage(rawBitmap, 0, 0, uiW, uiH);
+            rawBitmap.close(); // Instantly free up the heavy memory
+
+            // Using WebP here for excellent compression/quality ratio
             const uiBlob = await new Promise((res) =>
               resizeCanvas.toBlob(res, "image/webp", 0.92),
             );
@@ -962,12 +971,13 @@
               uiImg.src = uiUrl;
             });
 
-            const rawRatio = rawImg.naturalWidth / uiImg.naturalWidth;
-            // Keep original File for the raw pipeline
+            // 2. Use the captured dimensions instead of rawImg
+            const rawRatio = originalWidth / uiImg.naturalWidth;
+
             const rawMeta = {
               file,
-              width: rawImg.naturalWidth,
-              height: rawImg.naturalHeight,
+              width: originalWidth,
+              height: originalHeight,
             };
 
             images.push({
@@ -984,12 +994,11 @@
               selected: true,
             });
 
-            rawImg.src = "";
-            revokeBlobUrl(objectUrl);
             renderPreview();
             cleanupCanvas(resizeCanvas);
-            await new Promise((r) => requestAnimationFrame(r));
-            await new Promise((r) => setTimeout(r, 0));
+
+            // Yields execution completely so the UI can visually update
+            await new Promise((r) => setTimeout(r, 15));
           } catch (error) {
             console.error("Image load failed:", error);
             showToast("Some images failed to load", true);
@@ -1345,6 +1354,7 @@
           }
         });
       }
+      
       //#endregion
 
       // ==========================================
@@ -1451,7 +1461,7 @@
             openCombinedCropFromUrl(url);
           },
           "image/webp",
-          0.9,
+          0.92,
         );
       }
 
@@ -1514,7 +1524,7 @@
         const croppedCanvas = cropper.getCroppedCanvas();
 
         const uiBlob = await new Promise((res) =>
-          croppedCanvas.toBlob(res, "image/webp", 0.9),
+          croppedCanvas.toBlob(res, "image/webp", 0.92),
         );
         const uiUrl = URL.createObjectURL(uiBlob);
         const uiImg = new Image();
@@ -1793,7 +1803,7 @@
           tc.getContext("2d").drawImage(bitmap, 0, 0);
 
           const blob = await new Promise((res) =>
-            tc.toBlob(res, "image/jpeg", 0.9),
+            tc.toBlob(res, "image/webp", 0.92),
           );
           const proxyUrl = URL.createObjectURL(blob);
           bitmap.close();
@@ -1882,7 +1892,7 @@
           tc.getContext("2d").drawImage(bitmap, 0, 0);
 
           const blob = await new Promise((res) =>
-            tc.toBlob(res, "image/jpeg", 0.9),
+            tc.toBlob(res, "image/webp", 0.92),
           );
           const proxyUrl = URL.createObjectURL(blob);
           bitmap.close();
@@ -1974,13 +1984,24 @@
       // ==========================================
       // #region 18. FREEFORM RENDERING
       // ==========================================
+      let initCropRetries = 0;
+
       function initFreeCrop() {
         const img = document.getElementById("freeCropImage");
         const container = document.getElementById("freeCropContainer");
+
         if (container.clientWidth === 0 || img.naturalWidth === 0) {
-          requestAnimationFrame(initFreeCrop);
+          if (initCropRetries < 60) {
+            initCropRetries++;
+            requestAnimationFrame(initFreeCrop);
+          } else {
+            initCropRetries = 0;
+            showToast("Failed to load crop interface.", true);
+            closeCrop();
+          }
           return;
         }
+        initCropRetries = 0;
 
         fCanvas.width = container.clientWidth;
         fCanvas.height = container.clientHeight;
@@ -2013,6 +2034,8 @@
       function drawFreeCrop() {
         const c = fCanvas.getContext("2d");
         c.clearRect(0, 0, fCanvas.width, fCanvas.height);
+        
+        // 1. Draw the dark overlay outside the crop area
         c.fillStyle = "rgba(0,0,0,0.6)";
         c.beginPath();
         c.rect(0, 0, fCanvas.width, fCanvas.height);
@@ -2023,8 +2046,9 @@
         c.closePath();
         c.fill("evenodd");
 
-        c.strokeStyle = "#0ea5e9";
-        c.lineWidth = 2.5;
+        // 2. Draw a thin, clean boundary line (No more bold borders)
+        c.strokeStyle = "#0ea5e9"; // Clean blue line
+        c.lineWidth = 1.5; // Thin and professional
         c.beginPath();
         c.moveTo(freeCorners[0].x, freeCorners[0].y);
         c.lineTo(freeCorners[1].x, freeCorners[1].y);
@@ -2033,36 +2057,16 @@
         c.closePath();
         c.stroke();
 
-        const hr = 30,
-          ls = 18;
-        c.lineWidth = 4;
-        c.strokeStyle = "#3b82f6";
-        freeCorners.forEach((p, i) => {
+        // 3. Draw ONLY the translucent touch circles at the corners
+        const hr = 30; // Radius for the touch target
+        freeCorners.forEach((p) => {
           c.beginPath();
           c.arc(p.x, p.y, hr, 0, Math.PI * 2);
-          c.fillStyle = "rgba(120,140,255,0.22)";
+          c.fillStyle = "rgba(14, 165, 233, 0.25)"; // Nice light blue circle
           c.fill();
-          c.beginPath();
-          if (i === 0) {
-            c.moveTo(p.x + ls, p.y);
-            c.lineTo(p.x, p.y);
-            c.lineTo(p.x, p.y + ls);
-          } else if (i === 1) {
-            c.moveTo(p.x - ls, p.y);
-            c.lineTo(p.x, p.y);
-            c.lineTo(p.x, p.y + ls);
-          } else if (i === 2) {
-            c.moveTo(p.x - ls, p.y);
-            c.lineTo(p.x, p.y);
-            c.lineTo(p.x, p.y - ls);
-          } else {
-            c.moveTo(p.x + ls, p.y);
-            c.lineTo(p.x, p.y);
-            c.lineTo(p.x, p.y - ls);
-          }
-          c.stroke();
         });
       }
+
       //#endregion
 
       // ==========================================
@@ -2178,8 +2182,7 @@
           const hMax = Math.max(h1, h2);
           const hMin = Math.min(h1, h2);
 
-          // Calculate convergence to detect optical foreshortening.
-          // Clamped to 0.15 to prevent memory crashes on extreme perspective drags.
+          // Calculate convergence to detect optical foreshortening.`1d23
           const vConverge = wMax > 0 ? Math.max(0.25, wMin / wMax) : 1;
           const hConverge = hMax > 0 ? Math.max(0.25, hMin / hMax) : 1;
 
@@ -2191,17 +2194,6 @@
           const offscreen = document.createElement("canvas");
           offscreen.width = destW;
           offscreen.height = destH;
-
-          /* const limits = getDeviceLimits();
-
-          if (destW * destH > limits.area) {
-            const scale = Math.sqrt(
-              limits.area / (destW * destH)
-            );
-
-            destW = Math.round(destW * scale);
-            destH = Math.round(destH * scale);
-          } */
 
           const offCtx = offscreen.getContext("2d", {
             willReadFrequently: true,
@@ -2261,129 +2253,150 @@
           const maxSw = sw - 1;
           const maxSh = sh - 1;
 
-          // 3. Render the pixels using true perspective mapping
-          for (let y = 0; y < destH; y++) {
-            const v = y / (destH - 1 || 1);
-            for (let x = 0; x < destW; x++) {
-              const u = x / (destW - 1 || 1);
-              
-              // Apply perspective division
-              const w = g * u + h * v + 1;
-              const sx = (a * u + b * v + c) / w;
-              const sy = (d * u + e * v + f) / w;
+          // Prevent naming conflict inside the worker
+          const d_coeff = d;
+          const e_coeff = e;
 
-              // Keep your excellent Bilinear sub-pixel interpolation!
-              if (sx >= 0 && sx < maxSw && sy >= 0 && sy < maxSh) {
-                const ix = Math.floor(sx),
-                  iy = Math.floor(sy);
-                const fx = sx - ix,
-                  fy = sy - iy;
+          const workerCode = `
+            self.onmessage = function(event) {
+              const { destW, destH, sw, sh, g, h, a, b, c, d_coeff, e_coeff, f, srcBuffer } = event.data;
+              const srcBuf = new Uint32Array(srcBuffer);
+              const destData = new Uint8ClampedArray(destW * destH * 4);
+              const destBuf = new Uint32Array(destData.buffer);
+              const maxSw = sw - 1;
+              const maxSh = sh - 1;
 
-                const p00 = srcBuf[iy * sw + ix];
-                const p10 = srcBuf[iy * sw + (ix + 1)];
-                const p01 = srcBuf[(iy + 1) * sw + ix];
-                const p11 = srcBuf[(iy + 1) * sw + (ix + 1)];
+              for (let y = 0; y < destH; y++) {
+                const v = y / (destH - 1 || 1);
+                for (let x = 0; x < destW; x++) {
+                  const u = x / (destW - 1 || 1);
+                  const w = g * u + h * v + 1;
+                  const sx = (a * u + b * v + c) / w;
+                  const sy = (d_coeff * u + e_coeff * v + f) / w;
 
-                const lerp = (v1, v2, t) => v1 + (v2 - v1) * t;
+                  if (sx >= 0 && sx < maxSw && sy >= 0 && sy < maxSh) {
+                    const ix = Math.floor(sx), iy = Math.floor(sy);
+                    const fx = sx - ix, fy = sy - iy;
 
-                const r = Math.round(
-                  lerp(
-                    lerp(p00 & 0xff, p10 & 0xff, fx),
-                    lerp(p01 & 0xff, p11 & 0xff, fx),
-                    fy,
-                  ),
-                );
-                const green = Math.round(
-                  lerp(
-                    lerp((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, fx),
-                    lerp((p01 >> 8) & 0xff, (p11 >> 8) & 0xff, fx),
-                    fy,
-                  ),
-                );
-                const blue = Math.round(
-                  lerp(
-                    lerp((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, fx),
-                    lerp((p01 >> 16) & 0xff, (p11 >> 16) & 0xff, fx),
-                    fy,
-                  ),
-                );
-                const alpha = Math.round(
-                  lerp(
-                    lerp((p00 >> 24) & 0xff, (p10 >> 24) & 0xff, fx),
-                    lerp((p01 >> 24) & 0xff, (p11 >> 24) & 0xff, fx),
-                    fy,
-                  ),
-                );
+                    const p00 = srcBuf[iy * sw + ix];
+                    const p10 = srcBuf[iy * sw + (ix + 1)];
+                    const p01 = srcBuf[(iy + 1) * sw + ix];
+                    const p11 = srcBuf[(iy + 1) * sw + (ix + 1)];
 
-                destBuf[y * destW + x] =
-                  (alpha << 24) | (blue << 16) | (green << 8) | r;
+                    const lerp = (v1, v2, t) => v1 + (v2 - v1) * t;
+
+                    const r = Math.round(lerp(lerp(p00 & 0xff, p10 & 0xff, fx), lerp(p01 & 0xff, p11 & 0xff, fx), fy));
+                    const green = Math.round(lerp(lerp((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, fx), lerp((p01 >> 8) & 0xff, (p11 >> 8) & 0xff, fx), fy));
+                    const blue = Math.round(lerp(lerp((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, fx), lerp((p01 >> 16) & 0xff, (p11 >> 16) & 0xff, fx), fy));
+                    const alpha = Math.round(lerp(lerp((p00 >> 24) & 0xff, (p10 >> 24) & 0xff, fx), lerp((p01 >> 24) & 0xff, (p11 >> 24) & 0xff, fx), fy));
+
+                    destBuf[y * destW + x] = (alpha << 24) | (blue << 16) | (green << 8) | r;
+                  }
+                }
               }
-            }
-          }
+              self.postMessage({ resultData: destData }, [destData.buffer]);
+            };
+          `;
 
-          offCtx.putImageData(destData, 0, 0);
-          offscreen.toBlob(
-            (blob) => {
-              const url = URL.createObjectURL(blob);
-              cleanupCanvas(srcCanvas);
-              cleanupCanvas(offscreen);
+          const workerBlob = new Blob([workerCode], {
+            type: "application/javascript",
+          });
+          const workerUrl = URL.createObjectURL(workerBlob);
+          const worker = new Worker(workerUrl);
 
-              if (cropMode === "combined") {
-                const finalImg = new Image();
-                finalImg.onload = () => {
-                  canvas.width = finalImg.width;
-                  canvas.height = finalImg.height;
-                  ctx.clearRect(0, 0, canvas.width, canvas.height);
-                  ctx.drawImage(finalImg, 0, 0);
-                  URL.revokeObjectURL(url);
-                  // FIX: Invalidate combined cache after perspective crop on canvas
-                  if (combinedCanvasCacheUrl) {
-                    URL.revokeObjectURL(combinedCanvasCacheUrl);
-                    combinedCanvasCacheUrl = null;
-                  }
-                  closeCrop();
-                  btn.innerText = "Apply";
-                  btn.disabled = false;
-                };
-                finalImg.src = url;
-              } else {
-                const imgObj = images[currentCropIndex];
-                if (imgObj.original?.startsWith("blob:"))
-                  URL.revokeObjectURL(imgObj.original);
-                const previewUrl = URL.createObjectURL(blob);
-                const updatedImg = new Image();
-                updatedImg.onload = () => {
-                  imgObj.current = previewUrl;
-                  imgObj.original = previewUrl;
-                  imgObj.img = updatedImg;
+          worker.onmessage = function (event) {
+            // 1. Terminate worker and clear blob URL to free up memory instantly
+            worker.terminate();
+            URL.revokeObjectURL(workerUrl);
 
-                  if (imgObj.rawBitmap) {
-                    try {
-                      imgObj.rawBitmap.close();
-                    } catch (e) {}
-                  }
+            const finalImageData = new ImageData(
+              event.data.resultData,
+              destW,
+              destH,
+            );
+            offCtx.putImageData(finalImageData, 0, 0);
 
-                  imgObj.rawBitmap = null;
+            offscreen.toBlob(
+              (blob) => {
+                const url = URL.createObjectURL(blob);
+                cleanupCanvas(srcCanvas);
+                cleanupCanvas(offscreen);
 
-                  // FIX: Update rawMeta after perspective crop
-                  imgObj.rawMeta = {
-                    file: blob,
-                    width: updatedImg.naturalWidth,
-                    height: updatedImg.naturalHeight,
+                if (cropMode === "combined") {
+                  const finalImg = new Image();
+                  finalImg.onload = () => {
+                    canvas.width = finalImg.width;
+                    canvas.height = finalImg.height;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(finalImg, 0, 0);
+                    URL.revokeObjectURL(url);
+                    if (combinedCanvasCacheUrl) {
+                      URL.revokeObjectURL(combinedCanvasCacheUrl);
+                      combinedCanvasCacheUrl = null;
+                    }
+                    closeCrop();
+                    btn.innerText = "Apply";
+                    btn.disabled = false;
                   };
-                  imgObj.rawRatio = 1;
-                  imgObj.cropData = null;
-                  imgObj.freeFormData = true;
-                  renderPreview();
-                  openCrop(currentCropIndex, true);
-                  btn.innerText = "Apply";
-                  btn.disabled = false;
-                };
-                updatedImg.src = previewUrl;
-              }
+                  finalImg.src = url;
+                } else {
+                  const imgObj = images[currentCropIndex];
+                  if (imgObj.original?.startsWith("blob:"))
+                    URL.revokeObjectURL(imgObj.original);
+                  const previewUrl = URL.createObjectURL(blob);
+                  const updatedImg = new Image();
+                  updatedImg.onload = () => {
+                    imgObj.current = previewUrl;
+                    imgObj.original = previewUrl;
+                    imgObj.img = updatedImg;
+
+                    if (imgObj.rawBitmap) {
+                      try {
+                        imgObj.rawBitmap.close();
+                      } catch (e) {}
+                    }
+
+                    imgObj.rawBitmap = null;
+
+                    imgObj.rawMeta = {
+                      file: blob,
+                      width: updatedImg.naturalWidth,
+                      height: updatedImg.naturalHeight,
+                    };
+                    imgObj.rawRatio = 1;
+                    imgObj.cropData = null;
+                    imgObj.freeFormData = true;
+                    renderPreview();
+                    openCrop(currentCropIndex, true);
+                    btn.innerText = "Apply";
+                    btn.disabled = false;
+                  };
+                  updatedImg.src = previewUrl;
+                }
+              },
+              "image/png",
+              1,
+            );
+          };
+
+          // 2. THIS IS THE MISSING KEY: Start the worker and pass the image buffer
+          worker.postMessage(
+            {
+              destW,
+              destH,
+              sw,
+              sh,
+              g,
+              h,
+              a,
+              b,
+              c,
+              d_coeff,
+              e_coeff,
+              f,
+              srcBuffer: srcData.data.buffer,
             },
-            "image/png",
-            1,
+            [srcData.data.buffer], // Passing ownership of the buffer prevents lag
           );
         });
       }
@@ -2393,6 +2406,7 @@
       // ==========================================
       // #region 21. EXPORT ENGINE
       // ==========================================
+      
       async function downloadImage(e) {
         if (isProcessing) return;
         isProcessing = true;
@@ -2412,22 +2426,47 @@
           document.body.offsetHeight;
 
           const qualitySelect = document.getElementById("qualitySelect").value;
-          const isPNG = qualitySelect === "png";
-          const exportFormat = isPNG ? "image/png" : "image/jpeg";
-          const quality = isPNG ? 1 : Number(qualitySelect);
-          const fileExtension = isPNG ? "png" : "jpg";
+          const isWebP = qualitySelect === "webp";
+          const exportFormat = isWebP ? "image/webp" : "image/jpeg";
+          const quality = isWebP ? 0.95 : Number(qualitySelect);
+          const fileExtension = isWebP ? "webp" : "jpg";
 
-          if (canvas.width > 1 && canvas.height > 1) {
+            if (canvas.width > 1 && canvas.height > 1) {
             validateCanvasSize();
+
             let blob;
-            // FIX: Skip redundant canvas copy for PNG — export directly at native res
-            if (isPNG) {
-              blob = await exportCanvasBlob("image/png", 1);
+
+            const isIOS =
+              /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === "MacIntel" &&
+                navigator.maxTouchPoints > 1);
+
+            // 2. Detect ALL mobile devices (including Android) for memory limits
+            const isMobile = 
+              /Android|Mobi|iPhone|iPad|iPod/i.test(navigator.userAgent) || isIOS;
+            
+            // Define a strict safe area for iOS/Mobile (16.7 Megapixels)
+            const maxMobileArea = 16777216; 
+
+            //  Use isMobile here so Android gets protected too!
+            const isOversizedForMobile = isMobile && (canvas.width * canvas.height > maxMobileArea);
+
+            // Only bypass canvas resizing if it's WebP AND safely sized for the device
+            if (isWebP && !isOversizedForMobile) {
+              blob = await exportCanvasBlob(exportFormat, quality);
             } else {
               let maxW;
               if (qualitySelect === "0.45") maxW = 1400;
               else if (qualitySelect === "0.65") maxW = 2200;
-              else maxW = 3200;
+              else {
+                // For high quality or oversized WebP on mobile, calculate the max safe width dynamically
+                if (isOversizedForMobile) {
+                   maxW = Math.floor(Math.sqrt(maxMobileArea * (canvas.width / canvas.height)));
+                } else {
+                   maxW = 3200;
+                }
+              }
+              
               const scale = Math.min(1, maxW / canvas.width);
               const ec = document.createElement("canvas");
               ec.width = Math.round(canvas.width * scale);
@@ -2436,10 +2475,12 @@
               ec2.imageSmoothingEnabled = true;
               ec2.imageSmoothingQuality = "high";
               ec2.drawImage(canvas, 0, 0, ec.width, ec.height);
+              
               blob = await new Promise((r) =>
                 ec.toBlob(r, exportFormat, quality),
               );
             }
+            
             if (!blob) throw new Error("Export failed");
 
             const file = new File(
@@ -2447,10 +2488,6 @@
               `PicStitch_${Date.now()}.${fileExtension}`,
               { type: exportFormat },
             );
-            const isIOS =
-              /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-              (navigator.platform === "MacIntel" &&
-                navigator.maxTouchPoints > 1);
 
             if (
               isIOS &&
@@ -2532,10 +2569,6 @@
             try {
               await navigator.share({
                 files: generatedFiles,
-                title:
-                  selectedImages.length > 1
-                    ? "PicStitch Batch Export"
-                    : "PicStitch Export",
               });
               showToast(
                 selectedImages.length > 1
@@ -2580,262 +2613,281 @@
         }
       }
 
-      async function exportPDF(e) {
-        if (isProcessing) return;
-        isProcessing = true;
-        lockUI(true);
+      async function exportPDF(e) { 
+  if (isProcessing) return;
+  isProcessing = true;
+  lockUI(true);
 
-        flashButton(document.getElementById("exportPdfBtn"));
-        const btn = e.target;
-        const originalText = btn.innerText;
-        btn.innerText = "Processing...";
-        btn.style.opacity = "0.7";
-        btn.disabled = true;
-        await new Promise((r) => setTimeout(r, 50));
+  flashButton(document.getElementById("exportPdfBtn"));
+  const btn = e.target;
+  const originalText = btn.innerText;
+  btn.innerText = "Processing...";
+  btn.style.opacity = "0.7";
+  btn.disabled = true;
+  await new Promise((r) => setTimeout(r, 50));
 
-        try {
-          document.body.style.transform = "translateZ(0)";
-          await new Promise((r) => requestAnimationFrame(r));
-          document.body.offsetHeight;
+  try {
+    document.body.style.transform = "translateZ(0)";
+    await new Promise((r) => requestAnimationFrame(r));
+    document.body.offsetHeight;
 
-          const { jsPDF } = window.jspdf;
-          const qualitySelect = document.getElementById("qualitySelect").value;
-          const isPNG = qualitySelect === "png";
+    const { jsPDF } = window.jspdf;
+    const qualitySelect = document.getElementById("qualitySelect").value;
+    const isWebP = qualitySelect === "webp";
 
-          /* const mimeType = isPNG ? "image/png" : "image/jpeg";
-          const jsPdfFormat = isPNG ? "PNG" : "JPEG";
-          const quality = isPNG ? 1 : Number(qualitySelect); */
+    const mimeType = "image/jpeg";
+    const jsPdfFormat = "JPEG";
+    const quality = isWebP ? 0.98 : Number(qualitySelect);
 
-          const mimeType = "image/jpeg";
-          const jsPdfFormat = "JPEG";
-          const quality =
-            qualitySelect === "png" ? 0.98 : Number(qualitySelect);
+    // Let the user know we are protecting their PDF size!
+    if (isWebP) {
+      showToast("Optimizing PDF as Higher-Quality JPEG...", false);
+      await new Promise(r => setTimeout(r, 800)); 
+    }
 
-          if (canvas.width > 1 && canvas.height > 1) {
-            validateCanvasSize();
-            const pdfWidth = 800;
-            const pdfHeight = canvas.height * (pdfWidth / canvas.width);
-            const pdf = new jsPDF({
-              orientation: pdfHeight > pdfWidth ? "portrait" : "landscape",
-              unit: "px",
-              format: [pdfWidth, pdfHeight],
-            });
-            const blob = await exportCanvasBlob(mimeType, quality);
-            const url = URL.createObjectURL(blob);
-            const img = new Image();
-            await new Promise((resolve, reject) => {
-              img.onload = resolve;
-              img.onerror = reject;
-              img.src = url;
-            });
-            pdf.addImage(img, jsPdfFormat, 0, 0, pdfWidth, pdfHeight);
-            URL.revokeObjectURL(url);
-            const pdfBlob = pdf.output("blob");
-            const file = new File([pdfBlob], `PicStitch_${Date.now()}.pdf`, {
-              type: "application/pdf",
-            });
-            const isIOS =
-              /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-              (navigator.platform === "MacIntel" &&
-                navigator.maxTouchPoints > 1);
+    // ==========================================
+    // 1. STITCHED CANVAS EXPORT
+    // ==========================================
+    if (canvas.width > 1 && canvas.height > 1) {
+      validateCanvasSize();
 
-            if (
-              isIOS &&
-              navigator.canShare &&
-              navigator.canShare({ files: [file] })
-            ) {
-              try {
-                await navigator.share({ files: [file] });
-                showToast("Shared Successfully!");
-              } catch (err) {
-                console.log("Share cancelled.");
-              }
-            } else {
-              const pdfUrl = URL.createObjectURL(pdfBlob);
-              const link = document.createElement("a");
-              link.download = file.name;
-              link.href = pdfUrl;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
-              if (!isIOS) showToast("PDF Saved Successfully!");
-            }
-            return;
-          }
+      // Retina Approach: Standard physical page bounds (800pt width)
+      const pdfW = 800;
+      const pdfH = canvas.height * (pdfW / canvas.width);
 
-          const selectedImages = images.filter((img) => img.selected);
-          if (selectedImages.length === 0) {
-            showToast("No selected image to export", true);
-            return;
-          }
+      const pdf = new jsPDF({
+        orientation: pdfH > pdfW ? "portrait" : "landscape",
+        unit: "pt", // 'pt' handles scaling much better across devices
+        format: [pdfW, pdfH],
+      });
 
-          let combineIntoOne = false;
-          if (selectedImages.length > 1) {
-            document.body.style.transform = "";
+      // 16MP MOBILE PROTECTOR ---
+      let exportCanvas = canvas;
+      const maxPdfArea = 16000000; 
 
-            lockUI(false); // allow PDF modal buttons to be clicked
-
-            const choice = await getPdfExportChoice();
-
-            lockUI(true); // lock again after modal closes
-
-            if (choice === "cancel") {
-              document.body.style.transform = "";
-              btn.innerText = originalText;
-              btn.style.opacity = "1";
-              btn.disabled = false;
-              return;
-            }
-
-            document.body.style.transform = "translateZ(0)";
-            combineIntoOne = choice === "combine";
-          }
-
-          if (combineIntoOne) {
-            let pdf = null;
-            for (let i = 0; i < selectedImages.length; i++) {
-              const imgObj = selectedImages[i];
-              const exportImg = await getRawBitmap(imgObj);
-              const tc = document.createElement("canvas");
-              tc.width = exportImg.width;
-              tc.height = exportImg.height;
-              tc.getContext("2d").drawImage(exportImg, 0, 0);
-              const cleanData = tc.toDataURL(mimeType, quality);
-              const pdfW = 800,
-                pdfH = tc.height * (800 / tc.width);
-              const orient = pdfH > pdfW ? "portrait" : "landscape";
-              if (i === 0)
-                pdf = new jsPDF({
-                  orientation: orient,
-                  unit: "px",
-                  format: [pdfW, pdfH],
-                });
-              else pdf.addPage([pdfW, pdfH], orient);
-              pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
-            }
-            const pdfBlob = pdf.output("blob");
-            const file = new File(
-              [pdfBlob],
-              `PicStitch_MultiPage_${Date.now()}.pdf`,
-              { type: "application/pdf" },
-            );
-            const isIOS =
-              /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-              (navigator.platform === "MacIntel" &&
-                navigator.maxTouchPoints > 1);
-
-            if (
-              isIOS &&
-              navigator.canShare &&
-              navigator.canShare({ files: [file] })
-            ) {
-              try {
-                await navigator.share({
-                  files: [file],
-                  title: "PicStitch Multi-Page PDF",
-                });
-                showToast("PDF Shared Successfully!");
-              } catch (err) {
-                console.log("Share cancelled.");
-              }
-            } else {
-              const pdfUrl = URL.createObjectURL(pdfBlob);
-              const link = document.createElement("a");
-              link.download = file.name;
-              link.href = pdfUrl;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
-              if (!isIOS) showToast("PDF Saved!");
-            }
-          } else {
-            const generatedFiles = [];
-            for (let i = 0; i < selectedImages.length; i++) {
-              const imgObj = selectedImages[i];
-              const exportImg = await getRawBitmap(imgObj);
-              const tc = document.createElement("canvas");
-              tc.width = exportImg.width;
-              tc.height = exportImg.height;
-              tc.getContext("2d").drawImage(exportImg, 0, 0);
-              const cleanData = tc.toDataURL(mimeType, quality);
-              const pdfW = 800,
-                pdfH = tc.height * (800 / tc.width);
-              const pdf = new jsPDF({
-                orientation: pdfH > pdfW ? "portrait" : "landscape",
-                unit: "px",
-                format: [pdfW, pdfH],
-              });
-              pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
-              const pdfBlob = pdf.output("blob");
-              generatedFiles.push(
-                new File(
-                  [pdfBlob],
-                  `PicStitch_Selected_${Date.now()}_${i + 1}.pdf`,
-                  { type: "application/pdf" },
-                ),
-              );
-            }
-            const isIOS =
-              /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-              (navigator.platform === "MacIntel" &&
-                navigator.maxTouchPoints > 1);
-
-            if (
-              isIOS &&
-              navigator.canShare &&
-              navigator.canShare({ files: generatedFiles })
-            ) {
-              try {
-                await navigator.share({
-                  files: generatedFiles,
-                  title:
-                    selectedImages.length > 1
-                      ? "PicStitch Batch PDFs"
-                      : "PicStitch PDF",
-                });
-                showToast(
-                  selectedImages.length > 1
-                    ? "PDFs Shared Successfully!"
-                    : "PDF Shared Successfully!",
-                );
-              } catch (err) {
-                console.log("Share cancelled.");
-              }
-            } else {
-              for (let i = 0; i < generatedFiles.length; i++) {
-                const file = generatedFiles[i];
-                const url = URL.createObjectURL(file);
-                const link = document.createElement("a");
-                link.download = file.name;
-                link.href = url;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 2000);
-                if (generatedFiles.length > 1)
-                  await new Promise((r) => setTimeout(r, 250));
-              }
-              if (!isIOS)
-                showToast(
-                  generatedFiles.length > 1 ? "PDFs Saved!" : "PDF Saved!",
-                );
-            }
-          }
-        } catch (error) {
-          console.error("Export failed:", error);
-          showToast("Export failed", true);
-        } finally {
-          document.body.style.transform = "";
-          btn.innerText = originalText;
-          btn.style.opacity = "1";
-          btn.disabled = false;
-          lockUI(false);
-          isProcessing = false;
-          releaseRawBitmaps();
-        }
+      if (canvas.width * canvas.height > maxPdfArea) {
+        const scale = Math.sqrt(maxPdfArea / (canvas.width * canvas.height));
+        exportCanvas = document.createElement("canvas");
+        exportCanvas.width = Math.round(canvas.width * scale);
+        exportCanvas.height = Math.round(canvas.height * scale);
+        
+        const eCtx = exportCanvas.getContext("2d", { alpha: false });
+        eCtx.imageSmoothingEnabled = true;
+        eCtx.imageSmoothingQuality = "high";
+        eCtx.drawImage(canvas, 0, 0, exportCanvas.width, exportCanvas.height);
       }
+
+      // Extract the data from the safe exportCanvas
+      const cleanData = exportCanvas.toDataURL(mimeType, quality);
+
+      // Inject high-res data into the normal-sized physical page
+      pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
+      
+      const pdfBlob = pdf.output("blob");
+      const file = new File([pdfBlob], `PicStitch_${Date.now()}.pdf`, { type: "application/pdf" });
+      
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      if (isIOS && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          showToast("Shared Successfully!");
+        } catch (err) {
+          console.log("Share cancelled.");
+        }
+      } else {
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.download = file.name;
+        link.href = pdfUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+        if (!isIOS) showToast("PDF Saved Successfully!");
+      }
+      return;
+    } 
+
+    // ==========================================
+    // MULTIPLE IMAGE EXPORT LOGIC
+    // ==========================================
+    const selectedImages = images.filter((img) => img.selected);
+    if (selectedImages.length === 0) {
+      showToast("No selected image to export", true);
+      return;
+    }
+
+    let combineIntoOne = false;
+    if (selectedImages.length > 1) {
+      document.body.style.transform = "";
+      lockUI(false); 
+      const choice = await getPdfExportChoice();
+      lockUI(true); 
+
+      if (choice === "cancel") {
+        document.body.style.transform = "";
+        btn.innerText = originalText;
+        btn.style.opacity = "1";
+        btn.disabled = false;
+        return;
+      }
+      document.body.style.transform = "translateZ(0)";
+      combineIntoOne = choice === "combine";
+    }
+
+    // ==========================================
+    // 2. COMBINE MULTIPLE IMAGES INTO ONE PDF
+    // ==========================================
+    if (combineIntoOne) {
+      let pdf = null;
+      for (let i = 0; i < selectedImages.length; i++) {
+        const imgObj = selectedImages[i];
+        const exportImg = await getRawBitmap(imgObj);
+        const tc = document.createElement("canvas");
+        
+        // 16MP MOBILE PROTECTOR ---
+        let tw = exportImg.width;
+        let th = exportImg.height;
+        const maxPdfArea = 16000000; 
+        
+        if (tw * th > maxPdfArea) {
+          const scale = Math.sqrt(maxPdfArea / (tw * th));
+          tw = Math.round(tw * scale);
+          th = Math.round(th * scale);
+        }
+
+        tc.width = tw;
+        tc.height = th;
+        const tCtx = tc.getContext("2d");
+        tCtx.imageSmoothingEnabled = true;
+        tCtx.imageSmoothingQuality = "high";
+        tCtx.drawImage(exportImg, 0, 0, tc.width, tc.height);
+
+        const cleanData = tc.toDataURL(mimeType, quality);
+        const pdfW = 800; // Standard physical width
+        const pdfH = tc.height * (pdfW / tc.width);
+        const orient = pdfH > pdfW ? "portrait" : "landscape";
+        
+        if (i === 0) {
+          pdf = new jsPDF({
+            orientation: orient,
+            unit: "pt", // Safe unit sizing
+            format: [pdfW, pdfH],
+          });
+        } else {
+          pdf.addPage([pdfW, pdfH], orient);
+        }
+        
+        pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
+      }
+      const pdfBlob = pdf.output("blob");
+      const file = new File([pdfBlob], `PicStitch_MultiPage_${Date.now()}.pdf`, { type: "application/pdf" });
+      
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      if (isIOS && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          showToast("PDF Shared Successfully!");
+        } catch (err) {
+          console.log("Share cancelled.");
+        }
+      } else {
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.download = file.name;
+        link.href = pdfUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+        if (!isIOS) showToast("PDF Saved!");
+      }
+    } 
+    // ==========================================
+    // 3. EXPORT AS SEPARATE PDFS
+    // ==========================================
+    else {
+      const generatedFiles = [];
+      for (let i = 0; i < selectedImages.length; i++) {
+        const imgObj = selectedImages[i];
+        const exportImg = await getRawBitmap(imgObj);
+        const tc = document.createElement("canvas");
+        
+        // --- THAR AI'S 16MP MOBILE PROTECTOR ---
+        let tw = exportImg.width;
+        let th = exportImg.height;
+        const maxPdfArea = 16000000; 
+        
+        if (tw * th > maxPdfArea) {
+          const scale = Math.sqrt(maxPdfArea / (tw * th));
+          tw = Math.round(tw * scale);
+          th = Math.round(th * scale);
+        }
+
+        tc.width = tw;
+        tc.height = th;
+        const tCtx = tc.getContext("2d");
+        tCtx.imageSmoothingEnabled = true;
+        tCtx.imageSmoothingQuality = "high";
+        tCtx.drawImage(exportImg, 0, 0, tc.width, tc.height);
+
+        const cleanData = tc.toDataURL(mimeType, quality);
+        const pdfW = 800; // Standard physical width
+        const pdfH = tc.height * (pdfW / tc.width);
+        
+        const pdf = new jsPDF({
+          orientation: pdfH > pdfW ? "portrait" : "landscape",
+          unit: "pt", // Safe unit sizing
+          format: [pdfW, pdfH],
+        });
+        
+        pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
+        const pdfBlob = pdf.output("blob");
+        generatedFiles.push(
+          new File([pdfBlob], `PicStitch_Selected_${Date.now()}_${i + 1}.pdf`, { type: "application/pdf" })
+        );
+      }
+      
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      if (isIOS && navigator.canShare && navigator.canShare({ files: generatedFiles })) {
+        try {
+          await navigator.share({ files: generatedFiles });
+          showToast(selectedImages.length > 1 ? "PDFs Shared Successfully!" : "PDF Shared Successfully!");
+        } catch (err) {
+          console.log("Share cancelled.");
+        }
+      } else {
+        for (let i = 0; i < generatedFiles.length; i++) {
+          const file = generatedFiles[i];
+          const url = URL.createObjectURL(file);
+          const link = document.createElement("a");
+          link.download = file.name;
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+          if (generatedFiles.length > 1) await new Promise((r) => setTimeout(r, 250));
+        }
+        if (!isIOS) showToast(generatedFiles.length > 1 ? "PDFs Saved!" : "PDF Saved!");
+      }
+    }
+  } catch (error) {
+    console.error("Export failed:", error);
+    showToast("Export failed", true);
+  } finally {
+    document.body.style.transform = "";
+    btn.innerText = originalText;
+    btn.style.opacity = "1";
+    btn.disabled = false;
+    lockUI(false);
+    isProcessing = false;
+    releaseRawBitmaps();
+  }
+}
 
       function saveCanvasAsGroup() {
         flashButton(document.getElementById("saveGroupBtn"));
@@ -2850,96 +2902,116 @@
           return;
         }
 
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            isProcessing = false;
-            lockUI(false);
-            alert("This group is too large.");
-            return;
-          }
+        // 1. Protective Cap for Intermediate Groups
+        const maxSafeArea = 16777216; // 16 Megapixels
+        let targetCanvas = canvas;
+        let scale = 1;
 
-          const dataUrl = URL.createObjectURL(blob);
-          const img = new Image();
+        if (canvas.width * canvas.height > maxSafeArea) {
+          scale = Math.sqrt(maxSafeArea / (canvas.width * canvas.height));
+          targetCanvas = document.createElement("canvas");
+          targetCanvas.width = Math.round(canvas.width * scale);
+          targetCanvas.height = Math.round(canvas.height * scale);
+          const tCtx = targetCanvas.getContext("2d", { alpha: false });
+          tCtx.imageSmoothingEnabled = true;
+          tCtx.imageSmoothingQuality = "high";
+          tCtx.drawImage(canvas, 0, 0, targetCanvas.width, targetCanvas.height);
+        }
 
-          // FIX: Handle image load failure to guarantee UI unlock
-          img.onerror = () => {
-            isProcessing = false;
-            lockUI(false);
-            showToast("Failed to save group", true);
-          };
+        // 2. Change format from PNG to WebP to save massive amounts of RAM
+        targetCanvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              isProcessing = false;
+              lockUI(false);
+              alert("This group is too large.");
+              return;
+            }
 
-          img.onload = () => {
-            try {
-              images = images.filter((item) => {
-                if (item.selected) {
-                  if (item.original?.startsWith("blob:"))
-                    URL.revokeObjectURL(item.original);
-                  if (
-                    item.current?.startsWith("blob:") &&
-                    item.current !== item.original
-                  )
-                    URL.revokeObjectURL(item.current);
-                  return false;
-                }
-                return true;
-              });
+            const dataUrl = URL.createObjectURL(blob);
+            const img = new Image();
 
-              // FIX: Removed redundant pristineRawClone — it was never referenced anywhere
-              const pristineUiClone = new Image();
-              pristineUiClone.onerror = () => {
-                isProcessing = false;
-                lockUI(false);
-                showToast("Failed to save group", true);
-              };
-              pristineUiClone.onload = () => {
-                images.push({
-                  id: window.crypto?.randomUUID?.() ?? Date.now().toString(36),
-                  original: dataUrl,
-                  current: dataUrl,
-                  img,
-                  rawImg: img,
-                  rawRatio: 1,
-                  rawMeta: {
-                    file: blob,
-                    width: img.naturalWidth,
-                    height: img.naturalHeight,
-                  },
-                  pristineUrl: dataUrl,
-                  pristineImg: pristineUiClone,
-                  freeFormData: null,
-                  isGroup: true,
-                  selected: true,
-                });
-
-                const validIds = new Set(images.map((img) => img.id));
-                for (const key in cropHistory)
-                  if (key !== "combined" && !validIds.has(key))
-                    delete cropHistory[key];
-                for (const key in redoHistory)
-                  if (key !== "combined" && !validIds.has(key))
-                    delete redoHistory[key];
-
-                combineMode = null;
-                clearCanvas();
-                renderPreview();
-                if (images.length === 1) {
-                  combineVertical(false, false);
-                  combineMode = null;
-                }
-                showToast("Group Saved Successfully!");
-                isProcessing = false;
-                lockUI(false);
-              };
-              pristineUiClone.src = dataUrl;
-            } catch (err) {
-              console.error("saveCanvasAsGroup error:", err);
+            img.onerror = () => {
               isProcessing = false;
               lockUI(false);
               showToast("Failed to save group", true);
-            }
-          };
-          img.src = dataUrl;
-        }, "image/png");
+            };
+
+            img.onload = () => {
+              try {
+                images = images.filter((item) => {
+                  if (item.selected) {
+                    if (item.original?.startsWith("blob:"))
+                      URL.revokeObjectURL(item.original);
+                    if (
+                      item.current?.startsWith("blob:") &&
+                      item.current !== item.original
+                    )
+                      URL.revokeObjectURL(item.current);
+                    return false;
+                  }
+                  return true;
+                });
+
+                const pristineUiClone = new Image();
+                pristineUiClone.onerror = () => {
+                  isProcessing = false;
+                  lockUI(false);
+                  showToast("Failed to save group", true);
+                };
+                pristineUiClone.onload = () => {
+                  images.push({
+                    id:
+                      window.crypto?.randomUUID?.() ?? Date.now().toString(36),
+                    original: dataUrl,
+                    current: dataUrl,
+                    img,
+                    rawImg: img,
+                    rawRatio: 1,
+                    rawMeta: {
+                      file: blob,
+                      width: img.naturalWidth,
+                      height: img.naturalHeight,
+                    },
+                    pristineUrl: dataUrl,
+                    pristineImg: pristineUiClone,
+                    freeFormData: null,
+                    isGroup: true,
+                    selected: true,
+                  });
+
+                  const validIds = new Set(images.map((img) => img.id));
+                  for (const key in cropHistory)
+                    if (key !== "combined" && !validIds.has(key))
+                      delete cropHistory[key];
+                  for (const key in redoHistory)
+                    if (key !== "combined" && !validIds.has(key))
+                      delete redoHistory[key];
+
+                  combineMode = null;
+                  clearCanvas();
+                  renderPreview();
+                  if (images.length === 1) {
+                    combineVertical(false, false);
+                    combineMode = null;
+                  }
+                  showToast("Group Saved Successfully!");
+                  isProcessing = false;
+                  lockUI(false);
+                };
+                pristineUiClone.src = dataUrl;
+              } catch (err) {
+                console.error("saveCanvasAsGroup error:", err);
+                isProcessing = false;
+                lockUI(false);
+                showToast("Failed to save group", true);
+              }
+            };
+            img.src = dataUrl;
+          },
+          "image/webp",
+          0.95,
+        );
       }
 
       function getPdfExportChoice() {
@@ -2967,12 +3039,279 @@
         });
       }
 
+// Full resolution ExportPDF without caring mobile crash     
+/*       async function exportPDF(e) { 
+  if (isProcessing) return;
+  isProcessing = true;
+  lockUI(true);
+
+  flashButton(document.getElementById("exportPdfBtn"));
+  const btn = e.target;
+  const originalText = btn.innerText;
+  btn.innerText = "Processing...";
+  btn.style.opacity = "0.7";
+  btn.disabled = true;
+  await new Promise((r) => setTimeout(r, 50));
+
+  try {
+    document.body.style.transform = "translateZ(0)";
+    await new Promise((r) => requestAnimationFrame(r));
+    document.body.offsetHeight;
+
+    const { jsPDF } = window.jspdf;
+    const qualitySelect = document.getElementById("qualitySelect").value;
+    const isWebP = qualitySelect === "webp";
+
+    const mimeType = "image/jpeg";
+    const jsPdfFormat = "JPEG";
+    const quality = isWebP ? 0.98 : Number(qualitySelect);
+
+    // Let the user know we are protecting their PDF size!
+    if (isWebP) {
+      showToast("Optimizing PDF as Higher-Quality JPEG...", false);
+      await new Promise(r => setTimeout(r, 800)); 
+    }
+
+    // ==========================================
+    // 1. STITCHED CANVAS EXPORT
+    // ==========================================
+    if (canvas.width > 1 && canvas.height > 1) {
+      validateCanvasSize();
+
+      // Retina Approach: Standard physical page bounds (800pt width)
+      const pdfW = 800;
+      const pdfH = canvas.height * (pdfW / canvas.width);
+
+      const pdf = new jsPDF({
+        orientation: pdfH > pdfW ? "portrait" : "landscape",
+        unit: "pt", // 'pt' handles scaling much better across devices
+        format: [pdfW, pdfH],
+      });
+
+      // Use the absolute full resolution of the canvas for maximum sharpness
+      const cleanData = canvas.toDataURL(mimeType, quality);
+
+      // Inject high-res data into the normal-sized physical page
+      pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
+      
+      const pdfBlob = pdf.output("blob");
+      const file = new File([pdfBlob], `PicStitch_${Date.now()}.pdf`, { type: "application/pdf" });
+      
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      if (isIOS && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          showToast("Shared Successfully!");
+        } catch (err) {
+          console.log("Share cancelled.");
+        }
+      } else {
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.download = file.name;
+        link.href = pdfUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+        if (!isIOS) showToast("PDF Saved Successfully!");
+      }
+      return;
+    } 
+
+    // ==========================================
+    // MULTIPLE IMAGE EXPORT LOGIC
+    // ==========================================
+    const selectedImages = images.filter((img) => img.selected);
+    if (selectedImages.length === 0) {
+      showToast("No selected image to export", true);
+      return;
+    }
+
+    let combineIntoOne = false;
+    if (selectedImages.length > 1) {
+      document.body.style.transform = "";
+      lockUI(false); 
+      const choice = await getPdfExportChoice();
+      lockUI(true); 
+
+      if (choice === "cancel") {
+        document.body.style.transform = "";
+        btn.innerText = originalText;
+        btn.style.opacity = "1";
+        btn.disabled = false;
+        return;
+      }
+      document.body.style.transform = "translateZ(0)";
+      combineIntoOne = choice === "combine";
+    }
+
+    // ==========================================
+    // 2. COMBINE MULTIPLE IMAGES INTO ONE PDF
+    // ==========================================
+    if (combineIntoOne) {
+      let pdf = null;
+      for (let i = 0; i < selectedImages.length; i++) {
+        const imgObj = selectedImages[i];
+        const exportImg = await getRawBitmap(imgObj);
+        const tc = document.createElement("canvas");
+        
+        // Keep the exact original pixel dimensions for maximum sharpness
+        tc.width = exportImg.width;
+        tc.height = exportImg.height;
+        const tCtx = tc.getContext("2d");
+        tCtx.imageSmoothingEnabled = true;
+        tCtx.imageSmoothingQuality = "high";
+        tCtx.drawImage(exportImg, 0, 0, tc.width, tc.height);
+
+        const cleanData = tc.toDataURL(mimeType, quality);
+        const pdfW = 800; // Standard physical width
+        const pdfH = tc.height * (pdfW / tc.width);
+        const orient = pdfH > pdfW ? "portrait" : "landscape";
+        
+        if (i === 0) {
+          pdf = new jsPDF({
+            orientation: orient,
+            unit: "pt", // Safe unit sizing
+            format: [pdfW, pdfH],
+          });
+        } else {
+          pdf.addPage([pdfW, pdfH], orient);
+        }
+        
+        pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
+      }
+      const pdfBlob = pdf.output("blob");
+      const file = new File([pdfBlob], `PicStitch_MultiPage_${Date.now()}.pdf`, { type: "application/pdf" });
+      
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      if (isIOS && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          showToast("PDF Shared Successfully!");
+        } catch (err) {
+          console.log("Share cancelled.");
+        }
+      } else {
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.download = file.name;
+        link.href = pdfUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+        if (!isIOS) showToast("PDF Saved!");
+      }
+    } 
+    // ==========================================
+    // 3. EXPORT AS SEPARATE PDFS
+    // ==========================================
+    else {
+      const generatedFiles = [];
+      for (let i = 0; i < selectedImages.length; i++) {
+        const imgObj = selectedImages[i];
+        const exportImg = await getRawBitmap(imgObj);
+        const tc = document.createElement("canvas");
+        
+        // Keep the exact original pixel dimensions for maximum sharpness
+        tc.width = exportImg.width;
+        tc.height = exportImg.height;
+        const tCtx = tc.getContext("2d");
+        tCtx.imageSmoothingEnabled = true;
+        tCtx.imageSmoothingQuality = "high";
+        tCtx.drawImage(exportImg, 0, 0, tc.width, tc.height);
+
+        const cleanData = tc.toDataURL(mimeType, quality);
+        const pdfW = 800; // Standard physical width
+        const pdfH = tc.height * (pdfW / tc.width);
+        
+        const pdf = new jsPDF({
+          orientation: pdfH > pdfW ? "portrait" : "landscape",
+          unit: "pt", // Safe unit sizing
+          format: [pdfW, pdfH],
+        });
+        
+        pdf.addImage(cleanData, jsPdfFormat, 0, 0, pdfW, pdfH);
+        const pdfBlob = pdf.output("blob");
+        generatedFiles.push(
+          new File([pdfBlob], `PicStitch_Selected_${Date.now()}_${i + 1}.pdf`, { type: "application/pdf" })
+        );
+      }
+      
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      if (isIOS && navigator.canShare && navigator.canShare({ files: generatedFiles })) {
+        try {
+          await navigator.share({ files: generatedFiles });
+          showToast(selectedImages.length > 1 ? "PDFs Shared Successfully!" : "PDF Shared Successfully!");
+        } catch (err) {
+          console.log("Share cancelled.");
+        }
+      } else {
+        for (let i = 0; i < generatedFiles.length; i++) {
+          const file = generatedFiles[i];
+          const url = URL.createObjectURL(file);
+          const link = document.createElement("a");
+          link.download = file.name;
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+          if (generatedFiles.length > 1) await new Promise((r) => setTimeout(r, 250));
+        }
+        if (!isIOS) showToast(generatedFiles.length > 1 ? "PDFs Saved!" : "PDF Saved!");
+      }
+    }
+  } catch (error) {
+    console.error("Export failed:", error);
+    showToast("Export failed", true);
+  } finally {
+    document.body.style.transform = "";
+    btn.innerText = originalText;
+    btn.style.opacity = "1";
+    btn.disabled = false;
+    lockUI(false);
+    isProcessing = false;
+    releaseRawBitmaps();
+  }
+}
+ */
+
       //#endregion
 
       // ==========================================
       // #region 22. APP INITIALIZATION
       // ==========================================
       clearCanvas();
+      
+      // PRO KEYBOARD SHORTCUTS
+
+      window.addEventListener("keydown", (e) => {
+        const cropModal = document.getElementById("cropModal");
+
+        // Only trigger if the Crop Modal is actively open
+        if (cropModal && cropModal.style.display === "flex") {
+          // Apply Crop (Enter key)
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const applyBtn = document.getElementById("applyBtn");
+            // Only click it if it's not currently disabled (Processing)
+            if (applyBtn && !applyBtn.disabled) {
+              applyBtn.click();
+            }
+          }
+
+          // Close Modal / Cancel (Escape key)
+          if (e.key === "Escape") {
+            e.preventDefault();
+            closeCrop();
+          }
+        }
+      });
 
       window.addEventListener("beforeunload", () => {
         images.forEach((image) => {
@@ -2983,6 +3322,12 @@
             image.current !== image.original
           )
             URL.revokeObjectURL(image.current);
+          if (
+            image.pristineUrl?.startsWith("blob:") &&
+            image.pristineUrl !== image.original &&
+            image.pristineUrl !== image.current
+          )
+            URL.revokeObjectURL(image.pristineUrl);
         });
       });
 
@@ -3021,6 +3366,7 @@
           .catch((err) => console.error("SW registration failed:", err));
       }
       //#endregion
+    
     </script>
   </body>
 </html>

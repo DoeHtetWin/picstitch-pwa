@@ -1,4 +1,4 @@
-const CACHE_NAME = "picstitch-v32.8"; 
+const CACHE_NAME = "picstitch-v34.6"; 
 
 const ASSETS_TO_CACHE = [
   "./",
@@ -44,14 +44,24 @@ self.addEventListener("activate", (event) => {
 
 // Step 3: Intercept network requests
 self.addEventListener("fetch", (event) => {
+  // Add this guard clause! Ignore blob: and data: URIs.
+  if (!event.request.url.startsWith('http')) return;
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).catch(() => {
-        console.log("Offline and file not found in cache:", event.request.url);
+      // 1. Kick off network request in the background
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
+        return caches.open(CACHE_NAME).then((cache) => {
+          // Update the cache with the fresh version
+          cache.put(event.request, networkResponse.clone());
+          return networkResponse;
+        });
+      }).catch(() => {
+        console.log("Offline and file not found:", event.request.url);
       });
+
+      // 2. Immediately return cached response if it exists, otherwise wait for network
+      return cachedResponse || fetchPromise;
     })
   );
 });
