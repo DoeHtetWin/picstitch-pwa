@@ -171,3 +171,14 @@ to
 
               // Keep your excellent Bilinear sub-pixel interpolation!
               if (sx >= 0 && sx < maxSw && sy >= 0 && sy < maxSh) {
+
+update 33
+- fixed low resolution export
+
+update_V1.0_Stable
+
+-fixed export failed with huge MB when horizontal stitch and the vertical stitch together
+
+update_V1.01
+
+-fixed perspective crop corner handle.
